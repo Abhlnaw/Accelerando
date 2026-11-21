@@ -1,0 +1,17 @@
+{
+  "model": "Pretrained CREPE tiny, exported from torchcrepe 0.0.24",
+  "input": "float32 [1,1024], raw mono 16 kHz; normalization inside model",
+  "output": "float32 [1,360] pitch-bin activations",
+  "opset": 17,
+  "sha256": "2380c9accd59f87836555d9a7698e5a6d5cd52b9a87bc3af26be201241f2750c",
+  "max_activation_error_vs_pytorch": 2.5331974029541016e-07,
+  "tested_midi_pitches": [
+    40,
+    48,
+    60,
+    67,
+    69,
+    76,
+    84
+  ]
+}
