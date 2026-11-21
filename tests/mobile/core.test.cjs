@@ -28,6 +28,14 @@ test('unsupported polyphony, repeats and malformed music fail clearly',()=>{
  assert.throws(()=>parse('<html/>'),/MusicXML/);
  assert.throws(()=>parse('<!DOCTYPE x>'+xml(note())),/DOCTYPE/);
 });
+test('standard MusicXML external DOCTYPE is accepted without expanding custom entities',()=>{
+ assert.equal(parse('<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">'+xml(note())).notes.length,1);
+ assert.throws(()=>parse('<!DOCTYPE score-partwise [<!ENTITY x "text">]>'+xml(note())),/custom DOCTYPE/);
+});
+test('unrecognizable audio withholds personalized findings and unsupported notation is rejected at import',()=>{
+ const s=score(),report=C.assess(s,take(s).map(e=>({...e,midi:e.midi+24})));assert.equal(report.grade,null);assert.equal(report.findings.length,0);
+ assert.throws(()=>parse(xml(note().replace('<duration>1</duration>','<duration>0.3333</duration>'))),/unsupported/);
+});
 test('a multi-part MusicXML lets another instrument select its part',()=>{
  const source=xml(note()).replace('</score-partwise>','<part id="P2"><measure number="1"><attributes><divisions>1</divisions></attributes>'+note('G',4)+'</measure></part></score-partwise>');
  const s=parse(source,{profile:'violin',partIndex:1});assert.equal(s.parts.length,2);assert.equal(s.notes[0].midi,67);

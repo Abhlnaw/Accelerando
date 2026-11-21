@@ -26,8 +26,13 @@
   const frequency = midi => 440*2**((midi-69)/12);
   function parseScore(xml, {profile='guitar', transpose='score', partIndex=0, projectedChordLine=false,
                             DOMParser:Parser=globalThis.DOMParser}={}) {
+    if(!profiles[profile])throw Error('Choose a supported instrument profile.');
     if (!xml || xml.length>5*1024*1024) throw Error('Choose a MusicXML file smaller than 5 MB.');
-    if (/<!DOCTYPE|<!ENTITY/i.test(xml)) throw Error('Export MusicXML without a DOCTYPE or custom entities.');
+    if (/<!ENTITY|<!DOCTYPE[^>]*\[/i.test(xml)) throw Error('Export MusicXML without a custom DOCTYPE or entities.');
+    // Standard MusicXML exports commonly carry an external PUBLIC declaration.
+    // Remove it locally; never fetch a remote DTD or expand custom entities.
+    xml=xml.replace(/<!DOCTYPE\s+score-partwise\b[^>\[\]]*>/gi,'');
+    if (/<!DOCTYPE/i.test(xml)) throw Error('Export MusicXML without a custom DOCTYPE.');
     const doc = new Parser().parseFromString(xml,'text/xml');
     if (doc.querySelector('parsererror') || doc.documentElement.localName!=='score-partwise') throw Error('Choose a readable partwise MusicXML score.');
     const children=(e,tag)=>Array.from(e.children).filter(x=>x.localName===tag);
@@ -41,7 +46,8 @@
     if(part.querySelector('chord, backup'))throw Error('Live pitch tracking currently assesses one melodic line. Export one voice; chords and overlapping voices need a polyphonic model.');
     const result={title:doc.querySelector('work-title')?.textContent||doc.querySelector('movement-title')?.textContent||'Uploaded piece',
       parts:parts.map((p,i)=>({index:i,name:names.find(n=>n.id===p.getAttribute('id'))?.name||`Part ${i+1}`})), notes:[],measures:[],profile};
-    let divisions=1, cursor=0, shift=profiles[profile].transpose, signature='C', beats=4, beatType=4, clef='treble', pending=null;
+    let divisions=1, cursor=0, shift=transpose==='concert'?0:transpose==='score'?profiles[profile].transpose:Number(transpose), signature='C', beats=4, beatType=4, clef='treble', pending=null;
+    if(!Number.isFinite(shift))throw Error('Choose a valid written-to-sounding pitch setting.');
     for(const [mi, measure] of children(part,'measure').entries()) {
       let ordinal=0; const printed=measure.getAttribute('text')||measure.getAttribute('number')||String(mi+1);
       const bar={label:printed,events:[],onset:cursor,signature,beats,beatType,clef};
@@ -59,6 +65,7 @@
         if(!['note','forward'].includes(item.localName))continue;
         const duration=number(item,'duration',0)/divisions;
         if(duration<=0)throw Error('Each note and rest needs a positive duration.');
+        if(![.125,.25,.375,.5,.75,1,1.5,2,3,4].includes(duration))throw Error('This notation duration is unsupported. Export a melodic excerpt with standard note lengths.');
         const rest=item.localName==='forward'||!!child(item,'rest');
         if(rest){if(pending && !projectedChordLine)throw Error('A tie cannot continue through a rest.');pending=null;bar.events.push({rest:true,onset:cursor,duration});cursor+=duration;continue;}
         const p=child(item,'pitch');if(!p)throw Error('Unpitched percussion is not supported by this pitch model.');
@@ -66,6 +73,7 @@
         const pc={C:0,D:2,E:4,F:5,G:7,A:9,B:11}[step];
         if(pc===undefined||!Number.isInteger(alter))throw Error('Use standard semitone pitches in the score.');
         const written=12*(octave+1)+pc+alter, sounding=written+shift;
+        if(!Number.isInteger(octave)||written<0||written>127||sounding<0||sounding>127)throw Error('Score pitches must be in the MIDI range.');
         const ties=Array.from(item.querySelectorAll('tie, tied')).map(t=>t.getAttribute('type'));
         // A tied pitch may move to another chord rank in the next measure.
         if(projectedChordLine && pending &&
@@ -153,6 +161,8 @@
       const left=anchors.filter(a=>a.index<p.index).at(-1),right=anchors.find(a=>a.index>p.index);
       if(!left||!right)continue;
       const beats=right.note.onset-left.note.onset;if(beats<=0||beats>6)continue;
+      let longRest=false;for(let i=left.index;i<right.index;i++)if(score.notes[i+1].onset-score.notes[i].onset-score.notes[i].duration>=1.5)longRest=true;
+      if(longRest)continue;
       const rate=(right.event.onset-left.event.onset)/beats;
       const expected=left.event.onset+(p.note.onset-left.note.onset)*rate;
       const unknown=uncertain.some(t=>Math.abs(t-expected)<.25*rate);
@@ -160,7 +170,7 @@
         if(!unknown){missing++;colors[p.note.id]='missing';findings.push({kind:'missing',id:p.note.id,measure:p.note.measure,time:left.event.onset,approximate:true,
           message:`A ${pitchName(p.note.midi)} attack may be missing. Replay from the neighboring note and practice the entrance.`});}continue;
       }
-      if(unknown||path.some(g=>g.kind==='missing'&&g.index>left.index&&g.index<right.index))continue;
+      if(unknown||path.some(g=>g.kind==='missing'&&g.index>left.index&&g.index<right.index)||path.some(g=>g.kind==='extra'&&g.event.onset>left.event.onset&&g.event.onset<right.event.onset))continue;
       const before=(p.event.onset-left.event.onset)/(p.note.onset-left.note.onset);
       const after=(right.event.onset-p.event.onset)/(right.note.onset-p.note.onset);
       if(mode==='expressive'&&right.index===score.notes.length-1&&after>=before*1.5)continue;
@@ -177,8 +187,10 @@
     const components=mode==='guided'?[[pitch,.45],[coverage,.25],[rhythm,.20],[tempo,.10]]:[[pitch,.50],[coverage,.30],[rhythm,.20]];
     const available=components.filter(([v])=>v!==null);
     const grade=!partial&&sufficient?available.reduce((s,[v,w])=>s+v*w,0)/available.reduce((s,[,w])=>s+w,0):null;
+    const recognizable=partial?anchors.length>=Math.min(3,score.notes.length)&&anchors.length>=matches.length/2:sufficient;
+    if(!recognizable)for(const id of Object.keys(colors))if(colors[id]!=='correct')delete colors[id];
     const current=matches.at(-1)?.note.id||score.notes[0]?.id;
-    return {grade,pitch,coverage,rhythm,tempo:mode==='guided'?tempo:null,bpm,fraction,colors,current,path,findings:findings.slice(0,12),
+    return {grade,pitch,coverage,rhythm,tempo:mode==='guided'?tempo:null,bpm,fraction,colors,current,path,findings:recognizable?findings.slice(0,12):[],
       status:sufficient?'ok':'insufficient_evidence',uncertain:uncertain.length,matched:matches.length,
       model:'CREPE tiny · ONNX · on device'};
   }
