@@ -21,7 +21,7 @@ final class PitchEngine implements AutoCloseable {
     private final boolean[] clippedRing = new boolean[1024];
     private int writeIndex, clippingCount;
     private float previousInput, previousOutput;
-    private double noiseRms = 0.00003;
+    private final PeriodicPitch periodic = new PeriodicPitch();
     private long samples;
     private int untilFrame;
     private final ByteArrayOutputStream pcm = new ByteArrayOutputStream();
@@ -42,21 +42,42 @@ final class PitchEngine implements AutoCloseable {
     @SuppressWarnings("MissingPermission")
     void record(Listener listener) throws Exception {
         if(!running)return;
-        int rate = 48000;
-        int minimum = AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
-        recorder = new AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, rate,
-                AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, Math.max(minimum, 48000));
-        if (recorder.getState() != AudioRecord.STATE_INITIALIZED) {recorder.release();recorder=null;throw new IOException("Microphone could not initialize. Close other recording apps and retry.");}
+        int stride = 0;
+        for (int source : new int[]{MediaRecorder.AudioSource.MIC, MediaRecorder.AudioSource.VOICE_RECOGNITION}) {
+            for (int rate : new int[]{48000, 16000}) {
+                if (!running) return;
+                int minimum = AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+                if (minimum <= 0) continue;
+                AudioRecord candidate = null;
+                try {
+                    candidate = new AudioRecord(source, rate, AudioFormat.CHANNEL_IN_MONO,
+                            AudioFormat.ENCODING_PCM_16BIT, Math.max(minimum, rate));
+                    if (candidate.getState() == AudioRecord.STATE_INITIALIZED) {
+                        candidate.startRecording();
+                        if (candidate.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) {
+                            recorder = candidate;
+                            stride = rate / 16000;
+                            break;
+                        }
+                    }
+                } catch (IllegalArgumentException | IllegalStateException unavailable) {
+                    // Try the next source/rate combination supported by this device.
+                } finally {
+                    if (candidate != null && candidate != recorder) candidate.release();
+                }
+            }
+            if (recorder != null) break;
+        }
+        if (recorder == null) throw new IOException("Microphone could not start. Check microphone access and close other recording apps.");
         short[] chunk = new short[1536];
         try {
-            recorder.startRecording();
             int count = 0; float sum = 0;
             while (running && samples < 16000L * 180) {
                 int read = recorder.read(chunk, 0, chunk.length, AudioRecord.READ_BLOCKING);
                 if (read < 0) { if (!running) break; throw new IOException("Microphone stopped unexpectedly. Please retry."); }
                 for (int i=0; i<read; i++) {
                     sum += chunk[i] / 32768f;
-                    if (++count == 3) { sample(sum / 3, listener); count = 0; sum = 0; }
+                    if (++count == stride) { sample(sum / stride, listener); count = 0; sum = 0; }
                 }
             }
         } finally {
@@ -88,7 +109,7 @@ final class PitchEngine implements AutoCloseable {
         double energy = 0;
         for (float x : window) energy += x*x;
         double rms = Math.sqrt(energy/1024), seconds = Math.max(0, (samples-512)/16000.0);
-        if (rms < .00003) { noiseRms = .95 * noiseRms + .05 * rms; listener.frame(seconds, 0, 0, rms, 0, false); return; }
+        if (rms < .00003) { listener.frame(seconds, 0, 0, rms, 0, false); return; }
         long start = System.nanoTime();
         try (OnnxTensor input = OnnxTensor.createTensor(environment, FloatBuffer.wrap(window), new long[]{1,1024});
              OrtSession.Result output = session.run(Collections.singletonMap("audio",input))) {
@@ -102,28 +123,18 @@ final class PitchEngine implements AutoCloseable {
             for (int bin=Math.max(0,peak-4);bin<=Math.min(359,peak+4);bin++) { weight+=activations[bin];weighted+=bin*activations[bin]; }
             double midi=weight>0?binToMidi(weighted/weight):0;
             boolean clipped=clippingCount>10;
-            if (!clipped && best < .25)
-                noiseRms = .96 * noiseRms + .04 * rms;
             double confidence = best;
-            if (best >= .30 && best < .70 && rms > 1.65 * noiseRms) {
-                int lag = (int)Math.round(16000 / (440 * Math.pow(2, (midi-69)/12)));
-                if (lag >= 2 && lag * 3 <= window.length) {
-                    double match = similarity(lag);
-                    if (match >= .88 && similarity((lag+1)/2) < match-.08) confidence = .70;
+            if (!clipped && best < .65 && samples >= window.length) {
+                double measured = periodic.midi(window, lowMidi, highMidi);
+                if (Double.isFinite(measured)) {
+                    midi = measured;
+                    confidence = .70;
                 }
             }
             listener.frame(seconds,midi,clipped?0:Math.max(0,confidence),rms,(System.nanoTime()-start)/1e6,clipped);
         }
     }
 
-    private double similarity(int lag) {
-        double cross=0, a=0, b=0;
-        for (int i=lag; i<window.length; i++) {
-            double x=window[i], y=window[i-lag];
-            cross+=x*y; a+=x*x; b+=y*y;
-        }
-        return cross / Math.max(1e-15, Math.sqrt(a*b));
-    }
 
     static double binToMidi(double bin) {
         double hz = 10 * Math.pow(2, (1997.3794084376191 + 20 * bin)/1200);

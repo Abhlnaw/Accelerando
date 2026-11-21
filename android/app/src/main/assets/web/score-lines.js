@@ -133,20 +133,23 @@
     return Array.from(unique.values());
   }
 
-  function choose(lines, events, passage) {
-    const heard=events.filter(e=>e.confidence>=.65);
+  function choose(lines, events, passage, voice=false) {
+    const heard=events.filter(e=>e.confidence>=.60);
     const ranked=lines.map(line=>{
       const notes=line.score.notes.filter(n=>!passage || (n.onset>=passage.onset && n.onset<passage.end));
-      const row=new Uint16Array(heard.length+1);
-      for(const note of notes) {
-        let previous=0;
-        for(let j=1;j<=heard.length;j++) {
-          const old=row[j];
-          row[j]=Math.max(row[j-1],old,previous+Number(Math.abs(heard[j-1].midi-note.midi)<=.65));
-          previous=old;
+      const fits=(voice?[0,12,-12,24,-24]:[0]).map(shift=>{
+        const row=new Uint16Array(heard.length+1);
+        for(const note of notes) {
+          let previous=0;
+          for(let j=1;j<=heard.length;j++) {
+            const old=row[j];
+            row[j]=Math.max(row[j-1],old,previous+Number(Math.abs(heard[j-1].midi+shift-note.midi)<=.65));
+            previous=old;
+          }
         }
-      }
-      return {line,fit:2*row[heard.length]/Math.max(1,notes.length+heard.length)};
+        return row[heard.length];
+      });
+      return {line,fit:2*Math.max(...fits)/Math.max(1,notes.length+heard.length)};
     }).sort((a,b)=>b.fit-a.fit);
     return {line:ranked[0].line,ambiguous:ranked.length>1 && ranked[0].fit-ranked[1].fit<.05};
   }

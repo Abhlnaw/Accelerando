@@ -32,6 +32,14 @@ track or speaker playing while the microphone listens. If the app reports
 clipping, move it farther away. Quiet or ambiguous audio can remain ungraded.
 This build has not yet been tested with the physical Tab S7 FE microphone.
 
+**Follow written tempo** starts the cursor with the first stable heard note and
+uses MusicXML tempos (80 BPM when unspecified). **Target tempo** uses your BPM.
+**Follow my phrasing** moves with matched attacks. Only recorded notes count
+toward a grade in all three modes. Choose **Voice** to sing a melody in a
+consistent higher or lower octave. Select a measure before starting to score
+just that measure. A recognizable opening with at least four reliable matching
+notes can receive a separate excerpt score when the full piece is unfinished.
+
 ## Other inputs
 
 - **Music library → Import MusicXML** accepts an uncompressed partwise `.musicxml`

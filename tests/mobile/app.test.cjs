@@ -45,6 +45,14 @@ function finish(app,id='take-first',session=1){
  app.run(`window.nativeEvent('loading',{sessionId:${session},message:'Loading'});window.nativeEvent('started',{sessionId:${session}})`);
  app.run(`for(const note of score.notes){for(let i=0;i<16;i++)window.nativeEvent('frame',{sessionId:${session},time:note.onset*.6+i*.032,midi:note.midi,confidence:.95,rms:.1,inferenceMs:4});for(let i=16;i<19;i++)window.nativeEvent('frame',{sessionId:${session},time:note.onset*.6+i*.032,midi:0,confidence:0,rms:0,inferenceMs:0});}window.nativeEvent('stopped',{sessionId:${session},recordingId:'${id}',duration:4});`);
 }
+test('written-tempo cursor waits for sound then advances independently of earned notes',()=>{
+ const app=boot();app.click('home-continue');app.click('start');
+ app.run("nativeEvent('started',{}); nativeEvent('frame',{time:1,midi:0,confidence:0,rms:0})");
+ assert.equal(app.run('session.clock'),undefined);
+ app.run("for(let i=0;i<70;i++)nativeEvent('frame',{time:1.1+i*.032,midi:score.notes[0].midi,confidence:.62,rms:.001})");
+ assert.equal(app.run('lastAnalysis.matched'),1);
+ assert.notEqual(app.run('lastAnalysis.current'),app.run('score.notes[0].id'));
+});
 test('home is the launch page, with working practice/library/progress navigation',()=>{
  const app=boot();assert.equal(app.document.getElementById('home-page').hidden,false);
  app.click('home-continue');assert.equal(app.document.getElementById('practice-page').hidden,false);assert.ok(app.document.querySelectorAll('#score svg').length>0);
