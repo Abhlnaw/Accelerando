@@ -1,5 +1,16 @@
 # Accelerando
 
+In the Streamlit studio, open **Webcam technique** to practice a visible
+position while singing or playing. Choose a mode and camera-facing setup,
+enable the webcam on localhost or HTTPS, and start the check. **Hold a
+position** compares ten seconds of practice against a three-second reference.
+The browser tracks shoulder tilt and either head tilt or the selected elbow
+angle and shows their individual scores. **Repeat a gesture** calibrates two
+positions, then grades how consistently you reach each of four timed targets.
+A low-visibility take prompts a retry.
+Frames and landmarks stay in the browser. The form score measures consistency
+with the chosen pose and is independent of sheet-music grading.
+
 A local practice coach for a short solo melody: MusicXML → audio observations →
 alignment → a practice action with replay from the original take.
 

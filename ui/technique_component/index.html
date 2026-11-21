@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}body{margin:0;color:#27251f;font:16px/1.5 system-ui,sans-serif;background:#faf8f3}
+main{padding:16px;max-width:800px}label,button,select{font:inherit}button,select{padding:7px 12px;margin:3px;border-radius:6px;border:1px solid #827d71}
+button{background:#243d36;color:white;cursor:pointer}button:disabled{opacity:.5;cursor:default}
+.preview{position:relative;width:min(100%,600px);background:#242923}.preview video{display:block;width:100%;height:auto}
+.preview canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.preview video,.preview canvas{transform:scaleX(-1)}
+[hidden]{display:none!important}output{display:block;white-space:pre-line}p{margin:8px 0}
+</style></head><body><main>
+<label>Practice mode <select id="profile"></select></label>
+<label>Exercise <select id="exercise"><option value="steady">Hold a position</option><option value="gesture">Repeat a gesture</option></select></label>
+<label id="sideLabel">Arm to track <select id="side"><option value="left">Left</option><option value="right">Right</option></select></label>
+<p id="cue"></p><p>Face the camera and frame your head, shoulders and playing arm. Choose a reference position yourself or with your teacher. Video stays in this browser. The microphone stays off.</p>
+<div class="preview" id="preview" hidden><video id="video" autoplay muted playsinline></video><canvas id="overlay"></canvas></div>
+<button id="start">Enable camera</button><button id="record" hidden>Start form check</button><button id="stop" hidden>Stop camera</button>
+<p role="status" id="status"></p><output id="result" aria-live="polite"></output>
+<details><summary>How the form grade works</summary>
+<p>Hold a position you want to repeat for three seconds, then practice for ten seconds. The grade measures consistency with your own reference. Shoulder tilt and either head tilt or elbow bend each contribute half. Each visible sample earns full credit within 5° of your reference, falling to zero at 25°. The camera needs a stable reference and at least 28 of 40 practice samples.</p>
+<p>For a gesture, set two comfortable positions. When prompted, alternate between A and B twice. Each of the four cues gives you a second to move, then grades how often both angles match the target. Each cue needs at least four visible samples and contributes one quarter of the grade.</p>
+<p>A steady position can still be unsuitable for an exercise. Choose a target with your teacher when possible. Breath support, vocal strain, finger pressure and sound quality require other evidence. This check has its own grade alongside the audio practice workflow.</p></details>
+</main><script type="module" src="./camera.mjs"></script></body></html>
