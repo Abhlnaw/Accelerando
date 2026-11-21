@@ -3,6 +3,11 @@
 A local practice coach for a short solo melody: MusicXML → audio observations →
 alignment → a practice action with replay from the original take.
 
+The standalone **Android tablet app** is in [android/](android/README.md), with
+local microphone capture, neural pitch inference, live notation following and
+practice history. See its README for APK installation and Tab S7 FE testing.
+The Streamlit workflow below remains available for completed WAV analysis.
+
 All four work packages are integrated: MusicXML parsing, local pretrained CREPE
 pitch inference, interpretation-aware grading, and the Streamlit app. The bundled
 melodies and comparison takes are labeled synthetic. A permitted recorded flute

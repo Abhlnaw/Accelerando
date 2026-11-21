@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "scripts": {"test": "node --test ../../tests/mobile/*.test.cjs"},
+  "dependencies": {"vexflow": "4.2.5", "linkedom": "0.18.12"}
+}
