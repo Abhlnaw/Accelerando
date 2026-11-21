@@ -19,11 +19,18 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-Open the localhost URL printed by Streamlit. No API key, account or cloud endpoint
-is required. Select **Try an example** for real inference on the bundled synthetic
-recordings, or **Upload my performance** for a solo WAV and matching MusicXML.
-Inference runs only when Analyze is pressed; replay and other reruns reuse the
-completed session result. Changing input bytes clears the displayed result.
+Open the localhost URL printed by Streamlit. The app runs locally with no API
+key or account. Start from **Studio**, upload a solo WAV and matching MusicXML
+in **Practice**, or select a bundled synthetic performance in **Examples**.
+**Results** provides measure-level feedback, original audio replay, a written
+note table, reference comparisons, and diagnostics. **How it works** explains
+the grade and includes a labeled development preview.
+
+Select **Analyze take** to run inference and open Results. Page navigation and
+replay reuse the current session result. Changing the inputs for that take
+clears its result. The studio artwork and fonts are bundled for offline use.
+The editable screen designs are in the
+[Accelerando Figma file](https://www.figma.com/design/MCpnMokEoGfPuaGpdE9vzH).
 
 Supported inputs: uncompressed PCM WAV, at most 45 seconds and 25 MB, plus one
 single-part concert-pitch `.musicxml`/`.xml` score under 5 MB. The score importer
