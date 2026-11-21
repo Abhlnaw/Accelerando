@@ -13,6 +13,7 @@ android {
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     buildTypes { release { minifyEnabled false } }
     androidResources { noCompress += ['onnx'] }
+    sourceSets.main.assets.srcDir '../../ui/assets'
 }
 dependencies {
     implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.22.0'

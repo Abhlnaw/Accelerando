@@ -33,6 +33,14 @@ def guide():
         "- Upload a matching single-part MusicXML or XML score in concert pitch."
     )
     st.caption("Analysis runs on the machine hosting this app. Results stay in the active browser session.")
+    with st.container(border=True):
+        st.subheader("Practice live on Android", anchor=False)
+        st.write("The standalone tablet app follows your playing through the microphone. "
+                 "Pick a piece from the music library, tap a measure to rehearse it, "
+                 "and choose expressive practice or a target tempo. Finish the take "
+                 "to replay feedback and compare attempts in your on-device practice log.")
+        st.link_button("Android setup and installation",
+                       "https://github.com/Abhlnaw/Accelerando/blob/main/android/README.md")
     if st.checkbox("Show development preview"):
         from development_preview import preview
 

@@ -27,8 +27,8 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        getWindow().setStatusBarColor(0xff101c2c);
-        getWindow().setNavigationBarColor(0xff101c2c);
+        getWindow().setStatusBarColor(0xff251a15);
+        getWindow().setNavigationBarColor(0xff251a15);
         web=new WebView(this);setContentView(web);
         web.setOnApplyWindowInsetsListener((view,insets)->{view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets;});
         web.getSettings().setJavaScriptEnabled(true);
@@ -42,7 +42,15 @@ public final class MainActivity extends Activity {
                 if(!"appassets.androidplatform.net".equals(uri.getHost()))return new WebResourceResponse("text/plain","utf-8",new ByteArrayInputStream(new byte[0]));
                 String path=uri.getPath();
                 if(path==null||path.contains(".."))return null;
-                try {String name="web"+(path.equals("/")?"/index.html":path);
+                try {
+                    if (path.startsWith("/studio-assets/")) {
+                        String asset = path.substring("/studio-assets/".length());
+                        if (asset.matches("[a-z-]+\\.(woff2|webp)")) {
+                            String mime = asset.endsWith(".woff2") ? "font/woff2" : "image/webp";
+                            return new WebResourceResponse(mime, null, getAssets().open(asset));
+                        }
+                    }
+                    String name="web"+(path.equals("/")?"/index.html":path);
                     String mime=name.endsWith(".js")?"application/javascript":name.endsWith(".css")?"text/css":name.endsWith(".json")?"application/json":"text/html";
                     return new WebResourceResponse(mime,"utf-8",getAssets().open(name));
                 }catch(IOException ex){return new WebResourceResponse("text/plain","utf-8",new ByteArrayInputStream(new byte[0]));}
