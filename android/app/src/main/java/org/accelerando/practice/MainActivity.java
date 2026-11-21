@@ -24,6 +24,7 @@ public final class MainActivity extends Activity {
     private File recording;
     private boolean destroyed;
     private String exportData="";
+    private PermissionRequest pendingTunerMic;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -36,6 +37,26 @@ public final class MainActivity extends Activity {
         web.getSettings().setAllowFileAccess(false);
         web.getSettings().setAllowContentAccess(false);
         web.getSettings().setMediaPlaybackRequiresUserGesture(true);
+        web.setWebChromeClient(new WebChromeClient(){
+            @Override public void onPermissionRequest(PermissionRequest request) {
+                boolean audio = java.util.Arrays.asList(request.getResources())
+                        .contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE);
+                if (busy || !audio || !"https://appassets.androidplatform.net".equals(
+                        request.getOrigin().toString().replaceAll("/$", ""))) {
+                    request.deny();
+                    return;
+                }
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED) {
+                    request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                } else if (pendingTunerMic == null) {
+                    pendingTunerMic = request;
+                    requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},44);
+                } else request.deny();
+            }
+            @Override public void onPermissionRequestCanceled(PermissionRequest request) {
+                if (pendingTunerMic == request) pendingTunerMic=null;
+            }
+        });
         web.setWebViewClient(new WebViewClient(){
             @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request) {
                 Uri uri=request.getUrl();
@@ -83,6 +104,9 @@ public final class MainActivity extends Activity {
             });
         }
         @JavascriptInterface public void stop(){if(engine!=null)engine.stop();}
+        @JavascriptInterface public void stopReplay(){runOnUiThread(()->{
+            if(player!=null){player.release();player=null;}
+        });}
         @JavascriptInterface public void importFile(String kind){
             if(busy)return;importKind=kind;
             runOnUiThread(()->{Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.setType("*/*");intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -130,6 +154,12 @@ public final class MainActivity extends Activity {
     }
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){
         super.onRequestPermissionsResult(request,permissions,results);
+        if(request==44 && pendingTunerMic!=null){
+            if(!busy && results.length>0 && results[0]==PackageManager.PERMISSION_GRANTED)
+                pendingTunerMic.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+            else pendingTunerMic.deny();
+            pendingTunerMic=null;
+        }
         if(request==41){if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)begin(null);else message("error","Microphone permission is needed. Tap Start and allow audio recording.");}
     }
     @Override protected void onActivityResult(int request,int result,Intent data){
@@ -157,6 +187,10 @@ public final class MainActivity extends Activity {
         });
     }
     @Override protected void onPause(){super.onPause();if(engine!=null)engine.stop();if(player!=null){player.release();player=null;}}
+    @Override protected void onStop(){
+        super.onStop();
+        web.evaluateJavascript("document.querySelector('#tools-page iframe')?.contentWindow.stopPracticeTools?.()",null);
+    }
     @Override protected void onDestroy(){destroyed=true;if(engine!=null)engine.stop();worker.shutdown();web.destroy();super.onDestroy();}
     static byte[] readLimited(InputStream in,int limit)throws IOException{
         ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] block=new byte[8192];int count;
