@@ -26,6 +26,21 @@ function boot(persisted=new Map()){
  return {window:ctx,document,calls,persisted,run:code=>vm.runInContext(code,ctx),click:id=>document.getElementById(id).click()};
 }
 const melody=`<score-partwise><work><work-title>My Tune</work-title></work><part id="P1"><measure number="1"><attributes><divisions>1</divisions></attributes>${['C','D','E','F','G','A'].map(s=>`<note><pitch><step>${s}</step><octave>5</octave></pitch><duration>1</duration></note>`).join('')}</measure></part></score-partwise>`;
+test('manual journal sessions retain notes, minutes and recurring mistakes across restarts',()=>{
+ const app=boot();
+ app.run("setPage('progress')");
+ for(const focus of ['Entrance','Ending']){
+   app.document.getElementById('journal-focus').value=focus;
+   app.document.getElementById('journal-notes').value='Repeat slowly';
+   app.document.getElementById('journal-mistake').value='pitch';
+   app.run("$('journal-form').onsubmit({preventDefault(){}})");
+ }
+ const next=boot(app.persisted);
+ next.run("setPage('progress')");
+ assert.match(next.document.getElementById('journal-patterns').textContent,/pitch.*2 sessions/);
+ assert.match(next.document.getElementById('attempts').textContent,/Repeat slowly/);
+ assert.equal(next.run('store.summary().minutes'),30);
+});
 function finish(app,id='take-first',session=1){
  app.run(`window.nativeEvent('loading',{sessionId:${session},message:'Loading'});window.nativeEvent('started',{sessionId:${session}})`);
  app.run(`for(const note of score.notes){for(let i=0;i<16;i++)window.nativeEvent('frame',{sessionId:${session},time:note.onset*.6+i*.032,midi:note.midi,confidence:.95,rms:.1,inferenceMs:4});for(let i=16;i<19;i++)window.nativeEvent('frame',{sessionId:${session},time:note.onset*.6+i*.032,midi:0,confidence:0,rms:0,inferenceMs:0});}window.nativeEvent('stopped',{sessionId:${session},recordingId:'${id}',duration:4});`);

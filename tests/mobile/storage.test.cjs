@@ -1,6 +1,15 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const {create}=require('../../android/app/src/main/assets/web/storage.js');
 const memory=()=>{const m=new Map();return {getItem:k=>m.get(k)||null,setItem:(k,v)=>m.set(k,v)};};
+test('journal annotations persist and full session time replaces recorded time in totals',()=>{
+ const local=memory(),store=create(null,local);
+ store.addRecord({title:'Scale',date:1,duration:15,grade:90,recordingId:'audio'});
+ store.updateRecord(0,{focus:'Entrances',notes:'Repeat tomorrow',practiceSeconds:600,mistake:'pitch'});
+ const reopened=create(null,local);
+ assert.equal(reopened.summary().minutes,10);
+ assert.equal(reopened.records()[0].notes,'Repeat tomorrow');
+ assert.equal(reopened.records()[0].recordingId,'audio');
+});
 test('library, settings and practice reports survive repository reconstruction',()=>{
  const local=memory(),store=create(null,local);const piece=store.addPiece('<score/>','My melody');store.saveSettings({pieceId:piece.id,instrument:'violin'});
  store.addRecord({title:'My melody',date:1,duration:60,pieceId:piece.id,grade:88});

@@ -16,6 +16,7 @@ def results():
             st.page_link("ui/examples.py", label="Explore examples", icon=":material/library_music:")
         return
     show_analysis(take.analysis, take.request.audio_bytes, take.identity, take.request)
+    st.page_link("ui/journal.py", label="Log this practice session", icon=":material/book:")
     st.page_link("ui/practice.py", label="Practice another take", icon=":material/mic:")
 
 

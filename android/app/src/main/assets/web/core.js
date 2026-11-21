@@ -199,7 +199,7 @@
     const attempts=records.filter(r=>r.scoreKey===scoreKey&&r.instrument===instrument).sort((a,b)=>a.date-b.date);
     const graded=attempts.filter(a=>Number.isFinite(a.grade));
     return {attempts,graded,best:graded.length?Math.max(...graded.map(r=>r.grade)):null,
-      minutes:attempts.reduce((s,a)=>s+a.duration,0)/60,improvement:graded.length>1?graded.at(-1).grade-graded[0].grade:null};
+      minutes:attempts.reduce((s,a)=>s+(a.practiceSeconds??a.duration),0)/60,improvement:graded.length>1?graded.at(-1).grade-graded[0].grade:null};
   }
   return {profiles,parseScore,Segmenter,align,assess,historySummary,pitchName,frequency,median,credit};
 });

@@ -31,8 +31,15 @@
         const piece={id:'score-'+id(),title,xml,partIndex,date:Date.now()};const next=[...library,piece];
         write('library',next);library=next;return piece;
       },
+      updateRecord(index, fields){
+        if(!records[index])throw Error('Choose a saved session.');
+        const next=records.slice();
+        next[index]={...records[index],...fields};
+        write('history',next);
+        records=next;
+      },
       addRecord(record){const next=[...records,{...record,id:record.id||id()}].slice(-500);write('history',next);records=next;return next.at(-1);},
-      summary(){return {attempts:records.length,minutes:records.reduce((s,r)=>s+Math.max(0,r.duration),0)/60,
+      summary(){return {attempts:records.length,minutes:records.reduce((s,r)=>s+(r.practiceSeconds??r.duration),0)/60,
         pieces:new Set(records.map(r=>r.pieceId||r.title)).size,last:records.at(-1)||null};}
     };
   }

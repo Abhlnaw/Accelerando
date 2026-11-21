@@ -8,6 +8,13 @@ local microphone capture, neural pitch inference, live notation following and
 practice history. See its README for APK installation and Tab S7 FE testing.
 The Streamlit workflow below supports browser microphone recording and WAV uploads.
 
+Open **Practice journal** in Streamlit or **Progress → Practice journal** on the
+tablet to log time, material practiced, personal notes, and recurring mistakes.
+Streamlit can attach the current assessment and charts daily minutes and average
+grades by piece. Its journal is stored in the local user's
+`.accelerando/journal.sqlite3`. The tablet keeps its journal in device history
+alongside recorded takes. Enter the full session duration when annotating a take.
+
 Open **Practice tools** in either app for a live chromatic tuner, tap-tempo
 metronome, and sustained reference drone. The tuner and drone share the concert
 A calibration. The metronome and drone can play together. Use **Stop all** or

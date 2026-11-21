@@ -189,14 +189,59 @@ function renderProgress(){
   }else{const p=document.createElement('p');p.className='intro';p.textContent='Your first completed assessment starts this chart. Each take is a chance to notice something new.';host.append(p);}
   $('attempts').replaceChildren();
   const attempts=$('history-filter').value==='all'?recordStore:summary.attempts;
+  renderJournal(attempts);
   if(!attempts.length){const empty=document.createElement('p');empty.textContent='No attempts here yet. Finish a take to start your practice log.';$('attempts').append(empty);}
   for(const record of [...attempts].reverse())$('attempts').append(attemptRow(record));
 }
 
+function renderJournal(records){
+  const select=$('journal-session');
+  select.replaceChildren(new Option('New session without a recording',''));
+  const counts=new Map();
+  for(const record of [...records].reverse()){
+    select.add(new Option(record.title+' ? '+new Date(record.date).toLocaleString(),String(recordStore.indexOf(record))));
+    const kinds=new Set(Number.isFinite(record.grade)?record.findings.map(f=>f.kind):[]);
+    if(record.mistake)kinds.add(record.mistake);
+    for(const kind of kinds)counts.set(kind,(counts.get(kind)||0)+1);
+  }
+  $('journal-patterns').textContent=[...counts].filter(([,n])=>n>=2).sort((a,b)=>b[1]-a[1])
+    .map(([kind,n])=>kind+' ? '+n+' sessions').join(', ')||'Patterns appear after two sessions with the same mistake.';
+  select.onchange=()=>{
+    const record=select.value===''?null:recordStore[Number(select.value)];
+    $('journal-focus').value=record?.focus||'';
+    $('journal-notes').value=record?.notes||'';
+    $('journal-minutes').value=record?Math.max(0.01,Number(((record.practiceSeconds??record.duration)/60).toFixed(2))):15;
+    $('journal-mistake').value=record?.mistake||'';
+  };
+  select.onchange();
+  $('journal-form').onsubmit=event=>{
+    event.preventDefault();
+    const focus=$('journal-focus').value.trim();
+    if(!focus){$('journal-status').textContent='Enter what you practiced.';return;}
+    const fields={focus,notes:$('journal-notes').value.trim(),mistake:$('journal-mistake').value,
+      practiceSeconds:Number($('journal-minutes').value)*60};
+    try{
+      if(select.value==='')store.addRecord({...fields,manual:true,title:score.title,pieceId,scoreKey:key(),
+        instrument:$('instrument').value,date:Date.now(),duration:0,grade:null,fraction:0,findings:[]});
+      else store.updateRecord(Number(select.value),fields);
+      recordStore=store.records();
+      renderProgress();
+      $('journal-status').textContent='Session saved.';
+    }catch(error){$('journal-status').textContent=error.message;}
+  };
+}
+
 function attemptRow(record){
   const row=document.createElement('div');row.className='attempt';const text=document.createElement('div');text.textContent=record.title;
-  const small=document.createElement('small');small.textContent=`${new Date(record.date).toLocaleString()} · ${Coach.profiles[record.instrument]?.name||record.instrument} · ${Math.round(record.duration)}s · ${record.passage||'Whole piece'}`;text.append(small);
-  const button=document.createElement('button');button.className='secondary';button.textContent=record.grade==null?'Open ungraded report':`${record.grade.toFixed(1)} / 100 · View report`;button.onclick=()=>openRecord(record);row.append(text,button);return row;
+  const small=document.createElement('small');small.textContent=`${new Date(record.date).toLocaleString()} · ${Coach.profiles[record.instrument]?.name||record.instrument} · ${Math.round(record.practiceSeconds??record.duration)}s · ${record.passage||'Whole piece'}`;text.append(small);
+  const button=document.createElement('button');button.className='secondary';button.textContent=record.grade==null?'Open ungraded report':`${record.grade.toFixed(1)} / 100 · View report`;button.onclick=()=>openRecord(record);if(record.focus||record.notes){
+    const detail=document.createElement('p');
+    detail.textContent=[record.focus,record.notes].filter(Boolean).join(' ? ');
+    text.append(detail);
+  }
+  row.append(text);
+  if(!record.manual)row.append(button);
+  return row;
 }
 function replay(seconds){if(phase!=='idle')return;if(!recordingId){notice('No saved audio is available for this report.');return;}if(window.Android?.replayTake)Android.replayTake(recordingId,seconds);else notice('Audio replay is available in the Android app.');}
 function renderHome(){
