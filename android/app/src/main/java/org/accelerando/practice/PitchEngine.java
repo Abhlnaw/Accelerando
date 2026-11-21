@@ -17,6 +17,11 @@ final class PitchEngine implements AutoCloseable {
     private volatile boolean running;
     private volatile AudioRecord recorder;
     private final float[] window = new float[1024];
+    private final float[] analysisRing = new float[1024];
+    private final boolean[] clippedRing = new boolean[1024];
+    private int writeIndex, clippingCount;
+    private float previousInput, previousOutput;
+    private double noiseRms = 0.00003;
     private long samples;
     private int untilFrame;
     private final ByteArrayOutputStream pcm = new ByteArrayOutputStream();
@@ -64,17 +69,25 @@ final class PitchEngine implements AutoCloseable {
     void stop() { running = false; }
 
     void sample(float value, Listener listener) throws Exception {
-        System.arraycopy(window, 1, window, 0, 1023);
-        window[1023] = value;
+        if (clippedRing[writeIndex]) clippingCount--;
+        clippedRing[writeIndex] = Math.abs(value) >= .99;
+        if (clippedRing[writeIndex]) clippingCount++;
+        // First-order 22 Hz high-pass on the analysis path. Preserve replay PCM.
+        previousOutput = value - previousInput + .9914f * previousOutput;
+        previousInput = value;
+        analysisRing[writeIndex] = previousOutput;
+        writeIndex = (writeIndex+1) % window.length;
         int encoded = Math.max(-32768, Math.min(32767, Math.round(value * 32767)));
         pcm.write(encoded & 255); pcm.write((encoded >> 8) & 255);
         samples++;
         if (++untilFrame < 512) return;
         untilFrame = 0;
-        double energy = 0; int clipping = 0;
-        for (float x : window) { energy += x*x; if (Math.abs(x) >= .99) clipping++; }
+        System.arraycopy(analysisRing, writeIndex, window, 0, window.length-writeIndex);
+        System.arraycopy(analysisRing, 0, window, window.length-writeIndex, writeIndex);
+        double energy = 0;
+        for (float x : window) energy += x*x;
         double rms = Math.sqrt(energy/1024), seconds = Math.max(0, (samples-512)/16000.0);
-        if (rms < .0015) { listener.frame(seconds, 0, 0, rms, 0, false); return; }
+        if (rms < .00003) { noiseRms = .95 * noiseRms + .05 * rms; listener.frame(seconds, 0, 0, rms, 0, false); return; }
         long start = System.nanoTime();
         try (OnnxTensor input = OnnxTensor.createTensor(environment, FloatBuffer.wrap(window), new long[]{1,1024});
              OrtSession.Result output = session.run(Collections.singletonMap("audio",input))) {
@@ -87,9 +100,28 @@ final class PitchEngine implements AutoCloseable {
             double weight=0, weighted=0;
             for (int bin=Math.max(0,peak-4);bin<=Math.min(359,peak+4);bin++) { weight+=activations[bin];weighted+=bin*activations[bin]; }
             double midi=weight>0?binToMidi(weighted/weight):0;
-            boolean clipped=clipping>10;
-            listener.frame(seconds,midi,clipped?0:Math.max(0,best),rms,(System.nanoTime()-start)/1e6,clipped);
+            boolean clipped=clippingCount>10;
+            if (!clipped && best < .25)
+                noiseRms = .96 * noiseRms + .04 * rms;
+            double confidence = best;
+            if (best >= .30 && best < .70 && rms > 1.65 * noiseRms) {
+                int lag = (int)Math.round(16000 / (440 * Math.pow(2, (midi-69)/12)));
+                if (lag >= 2 && lag * 3 <= window.length) {
+                    double match = similarity(lag);
+                    if (match >= .88 && similarity((lag+1)/2) < match-.08) confidence = .70;
+                }
+            }
+            listener.frame(seconds,midi,clipped?0:Math.max(0,confidence),rms,(System.nanoTime()-start)/1e6,clipped);
         }
+    }
+
+    private double similarity(int lag) {
+        double cross=0, a=0, b=0;
+        for (int i=lag; i<window.length; i++) {
+            double x=window[i], y=window[i-lag];
+            cross+=x*y; a+=x*x; b+=y*y;
+        }
+        return cross / Math.max(1e-15, Math.sqrt(a*b));
     }
 
     static double binToMidi(double bin) {
@@ -123,10 +155,23 @@ final class PitchEngine implements AutoCloseable {
             throw new IOException("Export as a mono or stereo 16-bit PCM WAV, 8–96 kHz.");
         int frames=length/(2*channels);
         if(frames/(double)rate>180)throw new IOException("Trim the recording to 3 minutes or less.");
+        // Choose a single recorded channel if a stereo average cancels the performance.
+        int firstChannel=0, channelCount=channels;
+        if (channels==2) {
+            double leftPower=0, rightPower=0, mixPower=0;
+            for (int i=0; i<frames; i++) {
+                double left=(short)integer(data,offset+4*i,2), right=(short)integer(data,offset+4*i+2,2);
+                leftPower+=left*left; rightPower+=right*right;
+                mixPower+=(left+right)*(left+right)*.25;
+            }
+            if (mixPower < Math.max(leftPower,rightPower)*.0625) {
+                firstChannel=rightPower>leftPower?1:0; channelCount=1;
+            }
+        }
         running=true;
         for(int i=0;i<(long)frames*16000/rate&&running;i++) {
             double position=i*rate/16000.0;int a=(int)position,b=Math.min(a+1,frames-1);float va=0,vb=0;
-            for(int c=0;c<channels;c++) {va+=(short)integer(data,offset+2*(a*channels+c),2)/32768f/channels;vb+=(short)integer(data,offset+2*(b*channels+c),2)/32768f/channels;}
+            for(int c=firstChannel;c<firstChannel+channelCount;c++) {va+=(short)integer(data,offset+2*(a*channels+c),2)/32768f/channelCount;vb+=(short)integer(data,offset+2*(b*channels+c),2)/32768f/channelCount;}
             sample((float)(va+(vb-va)*(position-a)),listener);
         }
         running=false;

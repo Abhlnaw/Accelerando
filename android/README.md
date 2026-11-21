@@ -34,7 +34,9 @@ This build has not yet been tested with the physical Tab S7 FE microphone.
 ## Other inputs
 
 - **Music library → Import MusicXML** accepts an uncompressed partwise `.musicxml`
-  or `.xml` file, up to 5 MB. Select the relevant part in a multiple-part score.
+  or `.xml` file, up to 5 MB. Finish a take to automatically identify the performed
+  line across parts, voices and chord tones. Select a written line in the library
+  for live score following or to resolve an ambiguous match.
   Uploads are for the current session; practice reports persist.
 - **Upload a take** runs on-device inference on an uncompressed PCM16 WAV, mono
   or stereo, 8–96 kHz, at most 25 MB / 3 minutes. It uses the currently selected
@@ -48,7 +50,7 @@ This build has not yet been tested with the physical Tab S7 FE microphone.
 
 The model tracks one pitched melodic line across the selectable instrument
 profiles. Profiles handle notation transposition; they are not separate trained
-instrument models. Chords, overlapping voices, ensembles, percussion, automatic
+instrument models. Simultaneous performed chord grading, ensembles, percussion, automatic
 PDF recognition, compressed MXL and game mechanics are not implemented. The app
 rejects unsupported scores instead of assigning fabricated note assessments.
 It retains the most recent take's audio for replay; older reports retain metrics.

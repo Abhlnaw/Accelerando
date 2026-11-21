@@ -6,7 +6,7 @@ alignment → a practice action with replay from the original take.
 The standalone **Android tablet app** is in [android/](android/README.md), with
 local microphone capture, neural pitch inference, live notation following and
 practice history. See its README for APK installation and Tab S7 FE testing.
-The Streamlit workflow below remains available for completed WAV analysis.
+The Streamlit workflow below supports browser microphone recording and WAV uploads.
 
 All four work packages are integrated: MusicXML parsing, local pretrained CREPE
 pitch inference, interpretation-aware grading, and the Streamlit app. The bundled
@@ -37,11 +37,11 @@ clears its result. The studio artwork and fonts are bundled for offline use.
 The editable screen designs are in the
 [Accelerando Figma file](https://www.figma.com/design/MCpnMokEoGfPuaGpdE9vzH).
 
-Supported inputs: uncompressed PCM WAV, at most 45 seconds and 25 MB, plus one
-single-part concert-pitch `.musicxml`/`.xml` score under 5 MB. The score importer
-owns validation of ties, parts, chords, repeats and notation. Compressed MXL,
-PDF transcription, polyphonic grading and video are outside this build.
-Use one unaccompanied instrument; accompanying music can confuse pitch tracking.
+Record in Practice or upload a PCM WAV up to 45 seconds and 25 MB. Add the matching
+partwise MusicXML under 5 MB. Sing or play one line from the score. The app compares
+the take to written parts, staves, voices and chord tones and identifies the line
+in the report. An ambiguous match withholds the grade. Full-chord audio grading,
+compressed MXL, PDF transcription and video are outside this build.
 
 ## Checks
 

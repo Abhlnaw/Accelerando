@@ -16,6 +16,36 @@ operates on a single melody in an approximate 33–2,000 Hz pitch range. Soft
 attacks can move slightly with the noise floor, and dense accompaniment or
 very short notes can make the evidence unreliable.
 
+## Recording-to-score assessment
+
+1. Record in Practice or submit a WAV. The extractor checks for clipping and
+   stereo cancellation, resamples to 16 kHz, filters subsonic energy, and uses
+   quiet windows to estimate a conservative noise spectrum.
+2. CREPE estimates fundamental frequency from the waveform. For borderline
+   predictions the extractor checks repetition at the estimated period and
+   rejects ambiguous half-period evidence. Note grouping uses sustained changes,
+   attacks and settled pitches after slides. Each event carries original seconds,
+   sounding MIDI and confidence. Desktop diagnostics also expose RMS in dBFS,
+   spectral centroid in Hz and the level change from attack to tail.
+3. Independently parse the MusicXML timeline, including backup, forward, staff,
+   voice, written transposition and simultaneous attacks. Within chords, follow
+   consistent pitch ranks. Compare each whole line with the confident observed
+   notes using ordered pitch matches, normalized by both sequence lengths.
+   Equivalent unison lines share a label. A margin below 0.05 is ambiguous.
+4. Pass the selected written line and the original observations to the alignment
+   and grading engine. Incorrect pitches stay in the take. Timbre measurements
+   are diagnostic and carry no grade weight. With crossed or intertwined voices,
+   the performed melody may not correspond to a single written candidate.
+
+### Singing benchmark
+
+Run `python -m audio.benchmark_vocadito path/to/vocadito.zip` against the
+original [vocadito dataset](https://zenodo.org/records/5578807). On all 40 clips,
+1,542 of 1,900 detected notes matched the first annotator's 2,237 notes within
+100 ms of onset and 50 cents of pitch (81.2% precision and 68.9% recall).
+These are desktop extraction measurements. Short notes and connected sung
+syllables remain difficult. The corpus was used during development.
+
 ## Model setup and verification
 
 Agent 4 maintains the root dependency list. The audio versions verified on
