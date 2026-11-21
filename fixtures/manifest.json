@@ -1,0 +1,36 @@
+{
+  "pieces": [
+    {
+      "piece_id": "piece_a",
+      "title": "Porch Light",
+      "edition": "team_v1",
+      "score_path": "fixtures/piece_a/score.musicxml",
+      "excerpt": {"first_measure": "1", "last_measure": "4"},
+      "reference_id": "piece_a_rendered_reference_v1",
+      "reference_path": "fixtures/piece_a/reference.wav",
+      "performer": null,
+      "source": "Synthetic rendering of the original Accelerando melody",
+      "permission": "Created for use in the Accelerando project",
+      "takes": [
+        {"id": "clean", "label": "Steady take (synthetic)", "audio_path": "fixtures/piece_a/clean.wav"},
+        {"id": "rubato", "label": "Phrase-ending slowdown (synthetic)", "audio_path": "fixtures/piece_a/rubato.wav"},
+        {"id": "variation", "label": "Pitch variation (synthetic)", "audio_path": "fixtures/piece_a/variation.wav"}
+      ]
+    },
+    {
+      "piece_id": "piece_b",
+      "title": "Turning Leaves",
+      "edition": "team_v1",
+      "score_path": "fixtures/piece_b/score.musicxml",
+      "excerpt": {"first_measure": "1", "last_measure": "3"},
+      "reference_id": null,
+      "reference_path": null,
+      "performer": null,
+      "source": "Original Accelerando melody with a synthetic demo take",
+      "permission": "Created for use in the Accelerando project",
+      "takes": [
+        {"id": "clean", "label": "Steady take (synthetic)", "audio_path": "fixtures/piece_b/clean.wav"}
+      ]
+    }
+  ]
+}
