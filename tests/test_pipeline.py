@@ -123,6 +123,15 @@ class PipelineTests(unittest.TestCase):
             with self.assertRaises(InputError):
                 p.fixture_path("../outside.wav", root)
 
+    def test_shipped_manifest_single_reference_is_resolved(self):
+        score = (p.ROOT / "fixtures/piece_a/score.musicxml").read_bytes()
+        refs = p.compatible_references(score)
+        self.assertEqual(len(refs), 1)
+        self.assertEqual(refs[0].reference_id, "piece_a_rendered_reference_v1")
+        self.assertTrue(refs[0].path.exists())
+        second_score = (p.ROOT / "fixtures/piece_b/score.musicxml").read_bytes()
+        self.assertEqual(p.compatible_references(second_score), [])
+
     def test_content_keys_ignore_renaming_but_detect_altered_take(self):
         renamed = p.Request(self.request.audio_bytes, self.request.score_bytes, "renamed.wav")
         changed = p.Request(wav_bytes(value=200), self.request.score_bytes)

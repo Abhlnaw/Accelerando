@@ -116,7 +116,13 @@ def compatible_references(score_bytes: bytes, root: Path = ROOT) -> list[Referen
         score_path = fixture_path(piece["score_path"], root)
         if not score_path.is_file() or sha256(score_path.read_bytes()).digest() != sha256(score_bytes).digest():
             continue
-        for ref in piece.get("references", []):
+        refs = list(piece.get("references", []))
+        # Agent 2's original catalog has one optional reference per piece.
+        if piece.get("reference_path") and piece.get("reference_id"):
+            refs.append({"reference_id": piece["reference_id"],
+                         "audio_path": piece["reference_path"],
+                         "source": piece.get("source"), "permission": piece.get("permission")})
+        for ref in refs:
             if ref.get("permission") and ref.get("source"):
                 found.append(ReferenceSpec(ref["reference_id"], fixture_path(ref["audio_path"], root),
                                            ref["source"], ref["permission"]))
@@ -204,11 +210,16 @@ def run_analysis(request: Request, progress: Callable[[str], None] = lambda _: N
                 data = spec.path.read_bytes()
                 validate_request(Request(data, request.score_bytes))
                 key = (sha256(data).hexdigest(), _version("audio"),
-                       getattr(extractor, "cache_version", "default-settings"))
+                       take.method, getattr(extractor, "cache_version", "default-settings"))
                 # Extract immutable bytes under an owned temporary name; avoids cache/read races.
                 ref_path = Path(folder) / "reference.wav"
                 ref_path.write_bytes(data)
                 ref_take = _cached(_reference_cache, key, lambda: extractor(ref_path))
+                if ref_take.method != take.method:
+                    # A fallback transition must not retain evidence under the
+                    # wrong active-method key. Retry it on the next submission.
+                    with _cache_lock:
+                        _reference_cache.pop(key, None)
                 if ref_take.events:
                     references.append((spec.reference_id, ref_take))
                     used.append(spec)

@@ -3,11 +3,11 @@
 A local practice coach for a short solo melody: MusicXML → audio observations →
 alignment → a practice action with replay from the original take.
 
-Agent 4's app and orchestration are implemented on `feat/app-integration`.
-The initial repository did not contain the audio, score or grading packages, or
-recorded fixtures. Genuine analysis becomes available when those owner branches
-are integrated. Missing packages produce an actionable error, never a fake grade.
-The development preview is explicitly synthetic and lives outside the pipeline.
+All four work packages are integrated: MusicXML parsing, local pretrained CREPE
+pitch inference, interpretation-aware grading, and the Streamlit app. The bundled
+melodies and comparison takes are labeled synthetic. A permitted recorded flute
+clip is included for real-performance inference checks. The separate development
+preview contains invented results and never feeds the upload pipeline.
 
 ## Start
 
@@ -20,8 +20,8 @@ python -m venv .venv
 ```
 
 Open the localhost URL printed by Streamlit. No API key, account or cloud endpoint
-is required. Select **Development preview** to review the practice screen before
-the owner modules land. Select **Upload my performance** for the real pipeline.
+is required. Select **Try an example** for real inference on the bundled synthetic
+recordings, or **Upload my performance** for a solo WAV and matching MusicXML.
 Inference runs only when Analyze is pressed; replay and other reruns reuse the
 completed session result. Changing input bytes clears the displayed result.
 
@@ -38,17 +38,20 @@ Use one unaccompanied instrument; accompanying music can confuse pitch tracking.
 .\.venv\Scripts\python.exe demo_check.py --output demo-results.json
 ```
 
-The first command checks orchestration with actual WAV bytes, explicit test
-doubles for domain stages, and Streamlit's AppTest. These checks do not validate
-musical accuracy or neural inference. The second command runs actual bundled
+The first command includes real CREPE audio tests, score and grading unit tests,
+orchestration boundary checks, Streamlit's AppTest, and real end-to-end runs with
+network connections blocked. Boundary checks explicitly use test doubles; the
+integration checks use all three real modules. The second command runs actual bundled
 files through the UI's pipeline and records the model, timings, events, grades
 and findings; it requires the owner modules and manifest. It fails clearly when
 no bundled takes exist. Do not present preview values as measured results.
 
-Verified environment for the app checks: Windows, CPython 3.12.0,
-Streamlit 1.51.0, pytest 8.4.2. Dependencies are centralized in requirements.txt;
-domain dependencies and pretrained-weight installation still need Agent 1's
-tested versions. A pYIN result must display its actual method and cannot satisfy
+Verified environment: Windows, CPython 3.12.0, Streamlit 1.51.0, pytest 8.4.2.
+The single requirements.txt includes Agent 1's CPU Torch/Torchaudio 2.8.0,
+torchcrepe 0.0.24, NumPy, SciPy, SoundFile and librosa versions. TorchCREPE ships
+the pretrained tiny CREPE weights in its wheel; no download occurs at inference.
+The score parser and grading modules use Python's standard library.
+A pYIN result displays its actual method and cannot satisfy
 the neural release check. CREPE credit belongs to its pretrained pitch model;
 the team implements segmentation, alignment, scoring and the interface.
 
@@ -84,7 +87,7 @@ Subscores use a dictionary with `pitch`, `coverage`, `rhythm`, all 0–100 or No
 Reference observations are `ReferenceObservation` dataclasses. See contracts.py.
 
 Parsed scores are cached by bytes and importer source version. Bundled reference
-features are cached by audio bytes, extractor source version and optional
+features are cached by audio bytes, extractor source version, active method and optional
 `extract.cache_version`. Agent 1 should set that hashable token to include the
 active method, model/weight version and preprocessing configuration; update it
 whenever any change. Do not use a static token when switching fallback methods.
@@ -94,7 +97,10 @@ Both caches are bounded, synchronized across sessions, and reset on restart.
 ## Bundled catalog agreement
 
 Agent 2 owns `fixtures/manifest.json` and its media. The app expects a `pieces`
-list (a top-level list is also accepted). Keep expected mistakes in separate test
+list (a top-level list is also accepted). The shipped manifest uses one optional
+`reference_path` and `reference_id` per piece, with piece-level source and
+permission. The list form below is also supported for multiple references.
+Keep expected mistakes in separate test
 metadata. Proposed paths: `fixtures/piece_a/score.musicxml`,
 `fixtures/piece_a/reference.wav`, `fixtures/piece_a/clean.wav`,
 `fixtures/piece_a/rubato.wav`, `fixtures/piece_a/wrong_note.wav`, and
@@ -130,9 +136,8 @@ inside fixtures/. Unknown editions still use score-only analysis.
 
 ## Release status
 
-Agent 4's boundary checks pass. Final release is pending owner branches, real
-CREPE weights and takes, an offline cold start, and the combined acceptance matrix.
-Use [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) to record actual values.
-Merge owners into `feat/app-integration`, resolve contracts with each producer,
-then open the reviewed integration PR into `main`. Do not merge the preview as
-evidence that the neural release gate passed.
+See [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) for measured integration
+evidence and outstanding human validation. The public recorded flute clip checks
+neural inference on a human performance; it does not replace recording the team's
+clean/rubato/wrong-note performances. A synthetic comparison does not establish
+grading accuracy across instruments or demonstrate learning gains.

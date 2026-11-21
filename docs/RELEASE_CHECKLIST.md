@@ -1,29 +1,35 @@
 # Integrated demo sign-off
 
-App boundary checks run on 2026-11-21: 15 passed. These use test doubles for
-unmerged owner modules. No actual inference, human performances or learning
-outcomes have been measured in this checkout.
+Integration checked on 2026-11-21 on Windows CPython 3.12.0. The full suite covers
+real CREPE audio, score parsing, grading, orchestration boundaries and the UI.
+The two original melodies and comparison takes are synthetic. The permitted
+recorded flute clip is a human performance; team comparison recordings and
+learning outcomes remain unevaluated.
+
+Measured outputs are saved in [demo-results.json](demo-results.json) and
+[runtime-evidence.json](runtime-evidence.json). These are observed inference
+results, separate from the hand-checked test answer key.
 
 | Required proof | Observed value / status |
 |---|---|
-| Agent 1 branch, dependencies and offline pretrained weights | Pending handoff |
-| Agent 2 branch, manifest, two scores and permitted human takes | Pending handoff |
-| Agent 3 branch, alignment and uncertainty-sensitive grading | Pending handoff |
-| Genuine uploaded WAV → CREPE predictions → final grade | Pending integration |
-| Active method and first/warm analysis seconds | Not measured |
-| Clean and rubato grades, assessed fractions, difference ≤5 target | Not measured |
-| Measure 2 substitution, detected measure and exact original timestamp | Not measured |
-| Omitted and extra note: later notes regain written IDs | Not measured |
-| Second piece uses the same pipeline without code changes | Not measured |
-| Silence returns null grade; noisy/clipped audio shows cautious feedback | Pending real extractor |
-| Missing reference preserves score-based result | Boundary check passed; real run pending |
-| Renamed upload with altered audio changes the result | Content-key check passed; real upload pending |
-| Reference caching after repeated submissions | Boundary check passed; real run pending |
-| Fresh checkout, offline model initialization and restart | Pending integrated build |
+| Agent 1 branch, dependencies and offline pretrained weights | PR #4 merged into integration; CPU weights included in installed torchcrepe wheel |
+| Agent 2 branch, manifest, two scores and permitted human takes | PR #1 merged into integration; two scores and synthetic takes; human team takes pending |
+| Agent 3 branch, alignment and uncertainty-sensitive grading | PR #3 merged into integration; unit and actual audio integration checks passed |
+| Genuine uploaded WAV → CREPE predictions → final grade | Recorded B3–D4 flute clip: 4 events, status ok, grade ≥95 in integration test |
+| Active method and first/warm analysis seconds | CREPE tiny (torchcrepe 0.0.24); same clean take total 4.623 s cold / 0.547 s warm; extraction 3.098 / 0.535 s |
+| Clean and rubato grades, assessed fractions, difference ≤5 target | Synthetic clean 100, rubato 100; both 100% assessed; difference 0 |
+| Measure 2 substitution, detected measure and exact original timestamp | Synthetic variation 96.54; m2n1 / measure 2; expected 3.583 s, detected 3.590 s |
+| Omitted and extra note: later notes regain written IDs | Grader unit checks pass with known note observations; no human omission/extra recordings supplied |
+| Second piece uses the same pipeline without code changes | Turning Leaves: 100, 100% assessed, score-only |
+| Silence returns null grade; noisy/clipped audio shows cautious feedback | Real silent upload yields null; extractor noise/clipping tests and grader uncertainty tests pass |
+| Missing reference preserves score-based result | Real second-piece result and broken-reference boundary check pass |
+| Renamed upload with altered audio changes the result | Same-filename altered bytes invalidate UI results; real files analyzed with renamed labels |
+| Reference caching after repeated submissions | Cache boundary check passed; actual warm reference stage 0.008 s vs 0.522 s cold |
+| Fresh checkout, offline model initialization and restart | Real inference with socket connections blocked passed in integration tests |
 | Replay accuracy on actual speakers and display | Pending human listen |
 | First-time users: count, time to locate finding, practice action, confusion | Not evaluated |
 | Backup recording of the live demo | Pending rehearsal |
-| Another teammate reviews final PR into main | Pending integrated build |
+| Another teammate reviews final PR into main | User explicitly waived this step and authorized main merge after checks |
 
 Run `python demo_check.py --output demo-results.json` on the actual demo laptop
 after merging owner branches. Run a second time for warm timing. Preserve real

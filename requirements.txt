@@ -1,5 +1,11 @@
-# Single environment list. Audio/model versions must be finalized with Agent 1.
+# Tested Windows CPython 3.12 environment; torchcrepe includes local CREPE weights.
+--extra-index-url https://download.pytorch.org/whl/cpu
 streamlit==1.51.0
 pytest==8.4.2
-# The orchestration and contracts use only Python's standard library.
-# Add domain dependencies here when their owner branches are integrated.
+numpy==2.5.5
+scipy==1.16.3
+soundfile==0.13.1
+librosa==0.11.0
+torch==2.8.0+cpu
+torchaudio==2.8.0+cpu
+torchcrepe==0.0.24

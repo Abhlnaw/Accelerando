@@ -1,0 +1,460 @@
+[
+  {
+    "piece_id": "piece_a",
+    "take": "Steady take (synthetic)",
+    "result": {
+      "status": "ok",
+      "grade": 100.0,
+      "subscores": {
+        "pitch": 100.0,
+        "coverage": 100.0,
+        "rhythm": 100.0
+      },
+      "warnings": [],
+      "reference_observations": [
+        {
+          "reference_id": "piece_a_rendered_reference_v1",
+          "affected_measures": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ],
+          "observation": "Your onset-to-onset span was 12.50 s. The reference span was 11.85 s. Yours was 5% longer. Across 14 shared notes, your median pitch was within 1 cent."
+        }
+      ],
+      "findings": [],
+      "assessed_fraction": 1.0
+    },
+    "method": "CREPE tiny (torchcrepe 0.0.24)",
+    "timings_s": {
+      "score": 0.01832769999964512,
+      "take_extraction": 2.589245099999971,
+      "references": 0.5060952000003454,
+      "grading": 0.01421940000000177,
+      "total": 4.020213699999658
+    },
+    "observed_events": [
+      {
+        "onset_s": 0.25,
+        "end_s": 1.03,
+        "midi_float": 60.02119445800781,
+        "confidence": 0.8619597554206848
+      },
+      {
+        "onset_s": 1.09,
+        "end_s": 1.87,
+        "midi_float": 60.01993370056152,
+        "confidence": 0.8618649840354919
+      },
+      {
+        "onset_s": 2.75,
+        "end_s": 3.5500000000000003,
+        "midi_float": 67.00061416625977,
+        "confidence": 0.8964815139770508
+      },
+      {
+        "onset_s": 3.58,
+        "end_s": 4.39,
+        "midi_float": 69.02032470703125,
+        "confidence": 0.9345027804374695
+      },
+      {
+        "onset_s": 4.42,
+        "end_s": 5.22,
+        "midi_float": 66.9990119934082,
+        "confidence": 0.8958105444908142
+      },
+      {
+        "onset_s": 5.25,
+        "end_s": 6.05,
+        "midi_float": 63.996835708618164,
+        "confidence": 0.8765747547149658
+      },
+      {
+        "onset_s": 6.08,
+        "end_s": 6.88,
+        "midi_float": 61.981306076049805,
+        "confidence": 0.9309836626052856
+      },
+      {
+        "onset_s": 6.92,
+        "end_s": 7.71,
+        "midi_float": 63.99794387817383,
+        "confidence": 0.8756299018859863
+      },
+      {
+        "onset_s": 7.75,
+        "end_s": 8.540000000000001,
+        "midi_float": 64.98954772949219,
+        "confidence": 0.9008344411849976
+      },
+      {
+        "onset_s": 8.59,
+        "end_s": 9.38,
+        "midi_float": 63.99798583984375,
+        "confidence": 0.8756720423698425
+      },
+      {
+        "onset_s": 9.42,
+        "end_s": 11.05,
+        "midi_float": 67.00004577636719,
+        "confidence": 0.8958553075790405
+      },
+      {
+        "onset_s": 11.09,
+        "end_s": 11.88,
+        "midi_float": 63.99798583984375,
+        "confidence": 0.8756720423698425
+      },
+      {
+        "onset_s": 11.91,
+        "end_s": 12.72,
+        "midi_float": 61.981441497802734,
+        "confidence": 0.9308645725250244
+      },
+      {
+        "onset_s": 12.75,
+        "end_s": 13.530000000000001,
+        "midi_float": 60.02119445800781,
+        "confidence": 0.8619597554206848
+      }
+    ]
+  },
+  {
+    "piece_id": "piece_a",
+    "take": "Phrase-ending slowdown (synthetic)",
+    "result": {
+      "status": "ok",
+      "grade": 100.0,
+      "subscores": {
+        "pitch": 100.0,
+        "coverage": 100.0,
+        "rhythm": 100.0
+      },
+      "warnings": [],
+      "reference_observations": [
+        {
+          "reference_id": "piece_a_rendered_reference_v1",
+          "affected_measures": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ],
+          "observation": "Your onset-to-onset span was 14.18 s. The reference span was 11.85 s. Yours was 20% longer. Across 14 shared notes, your median pitch was within 1 cent."
+        }
+      ],
+      "findings": [],
+      "assessed_fraction": 1.0
+    },
+    "method": "CREPE tiny (torchcrepe 0.0.24)",
+    "timings_s": {
+      "score": 0.0032219999993685633,
+      "take_extraction": 0.6108547000003455,
+      "references": 0.006707300000925898,
+      "grading": 0.0009843000007094815,
+      "total": 0.621781199999532
+    },
+    "observed_events": [
+      {
+        "onset_s": 0.25,
+        "end_s": 1.12,
+        "midi_float": 60.021432876586914,
+        "confidence": 0.8619645833969116
+      },
+      {
+        "onset_s": 1.17,
+        "end_s": 2.04,
+        "midi_float": 60.021432876586914,
+        "confidence": 0.8619645833969116
+      },
+      {
+        "onset_s": 3.0100000000000002,
+        "end_s": 3.9,
+        "midi_float": 67.00035858154297,
+        "confidence": 0.8962805867195129
+      },
+      {
+        "onset_s": 3.93,
+        "end_s": 4.82,
+        "midi_float": 69.0197982788086,
+        "confidence": 0.9344974756240845
+      },
+      {
+        "onset_s": 4.8500000000000005,
+        "end_s": 5.74,
+        "midi_float": 67.00035858154297,
+        "confidence": 0.8962805867195129
+      },
+      {
+        "onset_s": 5.7700000000000005,
+        "end_s": 6.65,
+        "midi_float": 63.99699592590332,
+        "confidence": 0.8769314289093018
+      },
+      {
+        "onset_s": 6.69,
+        "end_s": 7.58,
+        "midi_float": 61.981441497802734,
+        "confidence": 0.9309498071670532
+      },
+      {
+        "onset_s": 7.61,
+        "end_s": 8.49,
+        "midi_float": 63.99699592590332,
+        "confidence": 0.8769314289093018
+      },
+      {
+        "onset_s": 8.53,
+        "end_s": 9.4,
+        "midi_float": 64.98954772949219,
+        "confidence": 0.9013456702232361
+      },
+      {
+        "onset_s": 9.450000000000001,
+        "end_s": 10.33,
+        "midi_float": 63.99699592590332,
+        "confidence": 0.8769314289093018
+      },
+      {
+        "onset_s": 10.370000000000001,
+        "end_s": 12.22,
+        "midi_float": 66.99978637695312,
+        "confidence": 0.8964110016822815
+      },
+      {
+        "onset_s": 12.25,
+        "end_s": 13.25,
+        "midi_float": 63.99699592590332,
+        "confidence": 0.87653648853302
+      },
+      {
+        "onset_s": 13.290000000000001,
+        "end_s": 14.4,
+        "midi_float": 61.98183059692383,
+        "confidence": 0.9311019778251648
+      },
+      {
+        "onset_s": 14.43,
+        "end_s": 15.65,
+        "midi_float": 60.02119445800781,
+        "confidence": 0.8620409965515137
+      }
+    ]
+  },
+  {
+    "piece_id": "piece_a",
+    "take": "Pitch variation (synthetic)",
+    "result": {
+      "status": "ok",
+      "grade": 96.54452145754635,
+      "subscores": {
+        "pitch": 93.08904291509272,
+        "coverage": 100.0,
+        "rhythm": 100.0
+      },
+      "warnings": [],
+      "reference_observations": [
+        {
+          "reference_id": "piece_a_rendered_reference_v1",
+          "affected_measures": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ],
+          "observation": "Your onset-to-onset span was 12.50 s. The reference span was 11.85 s. Yours was 5% longer. Across 13 shared notes, your median pitch was within 1 cent."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "pitch",
+          "score_note_id": "m2n1",
+          "measure_label": "2",
+          "playback_s": 3.59,
+          "approximate_time": false,
+          "message": "You played about 98 cents sharp of A4. Replay the entrance, then tune to A4 and try it again."
+        }
+      ],
+      "assessed_fraction": 1.0
+    },
+    "method": "CREPE tiny (torchcrepe 0.0.24)",
+    "timings_s": {
+      "score": 0.00298800000018673,
+      "take_extraction": 0.5365010999994411,
+      "references": 0.005680500000380562,
+      "grading": 0.0010201000004599337,
+      "total": 0.5462011999989045
+    },
+    "observed_events": [
+      {
+        "onset_s": 0.25,
+        "end_s": 1.03,
+        "midi_float": 60.02119445800781,
+        "confidence": 0.8619597554206848
+      },
+      {
+        "onset_s": 1.09,
+        "end_s": 1.87,
+        "midi_float": 60.01993370056152,
+        "confidence": 0.8618649840354919
+      },
+      {
+        "onset_s": 2.75,
+        "end_s": 3.5500000000000003,
+        "midi_float": 67.00061416625977,
+        "confidence": 0.8964815139770508
+      },
+      {
+        "onset_s": 3.59,
+        "end_s": 4.38,
+        "midi_float": 69.97889709472656,
+        "confidence": 0.90056973695755
+      },
+      {
+        "onset_s": 4.42,
+        "end_s": 5.22,
+        "midi_float": 66.9990119934082,
+        "confidence": 0.8958105444908142
+      },
+      {
+        "onset_s": 5.25,
+        "end_s": 6.05,
+        "midi_float": 63.996835708618164,
+        "confidence": 0.8765747547149658
+      },
+      {
+        "onset_s": 6.08,
+        "end_s": 6.88,
+        "midi_float": 61.981306076049805,
+        "confidence": 0.9309836626052856
+      },
+      {
+        "onset_s": 6.92,
+        "end_s": 7.71,
+        "midi_float": 63.99794387817383,
+        "confidence": 0.8756299018859863
+      },
+      {
+        "onset_s": 7.75,
+        "end_s": 8.540000000000001,
+        "midi_float": 64.98954772949219,
+        "confidence": 0.9008344411849976
+      },
+      {
+        "onset_s": 8.59,
+        "end_s": 9.38,
+        "midi_float": 63.99798583984375,
+        "confidence": 0.8756720423698425
+      },
+      {
+        "onset_s": 9.42,
+        "end_s": 11.05,
+        "midi_float": 67.00004577636719,
+        "confidence": 0.8958553075790405
+      },
+      {
+        "onset_s": 11.09,
+        "end_s": 11.88,
+        "midi_float": 63.99798583984375,
+        "confidence": 0.8756720423698425
+      },
+      {
+        "onset_s": 11.91,
+        "end_s": 12.72,
+        "midi_float": 61.981441497802734,
+        "confidence": 0.9308645725250244
+      },
+      {
+        "onset_s": 12.75,
+        "end_s": 13.530000000000001,
+        "midi_float": 60.02119445800781,
+        "confidence": 0.8619597554206848
+      }
+    ]
+  },
+  {
+    "piece_id": "piece_b",
+    "take": "Steady take (synthetic)",
+    "result": {
+      "status": "ok",
+      "grade": 100.0,
+      "subscores": {
+        "pitch": 100.0,
+        "coverage": 100.0,
+        "rhythm": 100.0
+      },
+      "warnings": [
+        "SCORE_ONLY"
+      ],
+      "reference_observations": [],
+      "findings": [],
+      "assessed_fraction": 1.0
+    },
+    "method": "CREPE tiny (torchcrepe 0.0.24)",
+    "timings_s": {
+      "score": 0.004107299999304814,
+      "take_extraction": 0.4596471000004385,
+      "references": 0.002681400001165457,
+      "grading": 0.00043229999937466346,
+      "total": 0.4668805999990582
+    },
+    "observed_events": [
+      {
+        "onset_s": 0.25,
+        "end_s": 1.47,
+        "midi_float": 67.00021743774414,
+        "confidence": 0.8963978290557861
+      },
+      {
+        "onset_s": 1.5,
+        "end_s": 2.72,
+        "midi_float": 69.0197982788086,
+        "confidence": 0.9344974756240845
+      },
+      {
+        "onset_s": 2.75,
+        "end_s": 3.97,
+        "midi_float": 70.99730682373047,
+        "confidence": 0.9193965196609497
+      },
+      {
+        "onset_s": 4.0,
+        "end_s": 5.84,
+        "midi_float": 74.0001106262207,
+        "confidence": 0.9151172041893005
+      },
+      {
+        "onset_s": 5.87,
+        "end_s": 6.47,
+        "midi_float": 72.02699279785156,
+        "confidence": 0.9226924180984497
+      },
+      {
+        "onset_s": 6.5,
+        "end_s": 7.72,
+        "midi_float": 70.99730682373047,
+        "confidence": 0.9193965196609497
+      },
+      {
+        "onset_s": 7.75,
+        "end_s": 8.34,
+        "midi_float": 69.0197982788086,
+        "confidence": 0.9344974756240845
+      },
+      {
+        "onset_s": 9.0,
+        "end_s": 10.22,
+        "midi_float": 66.03417587280273,
+        "confidence": 0.9162269830703735
+      },
+      {
+        "onset_s": 10.25,
+        "end_s": 11.47,
+        "midi_float": 67.00021743774414,
+        "confidence": 0.8963978290557861
+      }
+    ]
+  }
+]

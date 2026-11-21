@@ -100,7 +100,7 @@ def main():
                     st.info("This piece has no bundled takes yet.")
                 else:
                     recording = st.selectbox("Performance", recordings, format_func=lambda r: r["label"])
-                    st.caption(recording.get("source", "Source not specified"))
+                    st.caption(recording.get("source", piece.get("source", "Source not specified")))
                     request = Request(fixture_path(recording["audio_path"]).read_bytes(),
                                       fixture_path(piece["score_path"]).read_bytes())
         except (InputError, OSError, KeyError) as exc:

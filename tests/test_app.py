@@ -5,12 +5,24 @@ from types import SimpleNamespace
 
 from streamlit.testing.v1 import AppTest
 from contracts import Result, Take
-from pipeline import Analysis, IntegrationError
+from pipeline import Analysis, IntegrationError, load_catalog
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class AppTests(unittest.TestCase):
+    def test_real_example_displays_measure_two_and_reference(self):
+        app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=60).run()
+        app.radio[0].set_value("Try an example").run()
+        app.selectbox[1].set_value(load_catalog()[0]["takes"][2]).run()
+        app.button[0].click().run()
+        self.assertFalse(app.exception)
+        self.assertFalse(app.error)
+        self.assertEqual(app.metric[0].value, "96.5 / 100")
+        self.assertTrue(any("Measure 2" in m.value for m in app.markdown))
+        completed = app.session_state["completed"]
+        self.assertTrue(completed[1].result.reference_observations)
+
     def test_changed_upload_clears_grade_and_reruns_do_not_analyze(self):
         audio = SimpleNamespace(name="same.wav", getvalue=lambda: b"first recording")
         score = SimpleNamespace(name="score.musicxml", getvalue=lambda: b"score")
@@ -58,8 +70,9 @@ class AppTests(unittest.TestCase):
         self.assertTrue(app.button[0].disabled)
 
     def test_example_catalog_absent_is_actionable(self):
-        app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20).run()
-        app.radio[0].set_value("Try an example").run()
+        with patch("pipeline.load_catalog", return_value=[]):
+            app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20).run()
+            app.radio[0].set_value("Try an example").run()
         self.assertFalse(app.exception)
         self.assertTrue(app.info)
         self.assertTrue(app.button[0].disabled)
