@@ -1,22 +1,186 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-*{box-sizing:border-box}body{margin:0;color:#27251f;font:16px/1.5 system-ui,sans-serif;background:#faf8f3}
-main{padding:16px;max-width:800px}label,button,select{font:inherit}button,select{padding:7px 12px;margin:3px;border-radius:6px;border:1px solid #827d71}
-button{background:#243d36;color:white;cursor:pointer}button:disabled{opacity:.5;cursor:default}
-.preview{position:relative;width:min(100%,600px);background:#242923}.preview video{display:block;width:100%;height:auto}
-.preview canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.preview video,.preview canvas{transform:scaleX(-1)}
-[hidden]{display:none!important}output{display:block;white-space:pre-line}p{margin:8px 0}
-</style></head><body><main>
-<label>Practice mode <select id="profile"></select></label>
-<label>Exercise <select id="exercise"><option value="steady">Hold a position</option><option value="gesture">Repeat a gesture</option></select></label>
-<label id="sideLabel">Arm to track <select id="side"><option value="left">Left</option><option value="right">Right</option></select></label>
-<p id="cue"></p><p>Face the camera and frame your head, shoulders and playing arm. Choose a reference position yourself or with your teacher. Video stays in this browser. The microphone stays off.</p>
-<div class="preview" id="preview" hidden><video id="video" autoplay muted playsinline></video><canvas id="overlay"></canvas></div>
-<button id="start">Enable camera</button><button id="record" hidden>Start form check</button><button id="stop" hidden>Stop camera</button>
-<p role="status" id="status"></p><output id="result" aria-live="polite"></output>
-<details><summary>How the form grade works</summary>
-<p>Hold a position you want to repeat for three seconds, then practice for ten seconds. The grade measures consistency with your own reference. Shoulder tilt and either head tilt or elbow bend each contribute half. Each visible sample earns full credit within 5° of your reference, falling to zero at 25°. The camera needs a stable reference and at least 28 of 40 practice samples.</p>
-<p>For a gesture, set two comfortable positions. When prompted, alternate between A and B twice. Each of the four cues gives you a second to move, then grades how often both angles match the target. Each cue needs at least four visible samples and contributes one quarter of the grade.</p>
-<p>A steady position can still be unsuitable for an exercise. Choose a target with your teacher when possible. Breath support, vocal strain, finger pressure and sound quality require other evidence. This check has its own grade alongside the audio practice workflow.</p></details>
-</main><script type="module" src="./camera.mjs"></script></body></html>
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        color: #222b25;
+        background: #faf8f3;
+        font:
+          16px/1.45 system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 840px;
+        padding: 12px;
+        display: grid;
+        gap: 10px;
+      }
+      .box,
+      details {
+        background: white;
+        border: 1px solid #d8d6cb;
+        border-radius: 12px;
+        padding: 12px;
+      }
+      .controls,
+      .buttons,
+      .cards {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .controls label {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      select,
+      button {
+        font: inherit;
+        padding: 8px;
+        border-radius: 7px;
+        border: 1px solid #949b91;
+      }
+      select {
+        display: block;
+        background: white;
+      }
+      button {
+        background: #244638;
+        color: white;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+      }
+      .cue {
+        background: #1e4035;
+        color: white;
+        border-radius: 12px;
+        padding: 14px 20px;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        justify-content: space-between;
+      }
+      #status,
+      #clock {
+        font-weight: 750;
+        font-size: clamp(22px, 4vw, 40px);
+        line-height: 1.12;
+      }
+      #clock {
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+      #hint {
+        margin: 5px 0 0;
+      }
+      .preview {
+        overflow: hidden;
+        background: #15251f;
+        line-height: 0;
+        border-radius: 10px;
+      }
+      canvas {
+        width: 100%;
+        height: auto;
+        transform: scaleX(-1);
+        cursor: crosshair;
+      }
+      video {
+        display: none;
+      }
+      .cards span {
+        border: 1px solid #d8d6cb;
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 14px;
+      }
+      .cards strong {
+        display: block;
+      }
+      .cards {
+        margin-top: 6px;
+      }
+      #result {
+        display: block;
+        white-space: pre-line;
+        font-weight: 600;
+      }
+      summary {
+        cursor: pointer;
+      }
+      p {
+        margin: 4px 0;
+      }
+      [hidden],
+      #result:empty {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="box controls">
+        <label>Instrument<select id="profile"></select></label>
+        <label
+          >Exercise<select id="exercise">
+            <option value="steady">Hold a position</option>
+            <option value="gesture">Repeat a gesture</option>
+          </select></label
+        >
+        <label id="stringsLabel" hidden
+          >Strings<select id="count">
+            <option>4</option>
+            <option>5</option>
+            <option>6</option>
+            <option>7</option>
+            <option>8</option>
+          </select></label
+        >
+      </div>
+      <div class="cue">
+        <div>
+          <div role="status" id="status">Set up your camera</div>
+          <p id="hint">Keep your head, elbows and hips in view.</p>
+        </div>
+        <span id="clock" aria-label="Seconds remaining"></span>
+      </div>
+      <div id="preview" class="preview" hidden>
+        <video id="video" autoplay muted playsinline></video
+        ><canvas id="overlay" width="640" height="480"></canvas>
+      </div>
+      <div class="buttons">
+        <button id="start">Enable camera</button
+        ><button id="record" hidden>Start form check</button
+        ><button id="remap" hidden>Remap strings</button
+        ><button id="stop" hidden>Stop camera</button>
+      </div>
+      <output id="result" class="box" aria-live="polite"></output>
+      <section class="box">
+        <strong>Posture</strong>
+        <div class="cards" id="body"></div>
+      </section>
+      <section class="box" id="fingerBox" hidden>
+        <strong>Left fingertips</strong>
+        <div class="cards" id="fingers"></div>
+      </section>
+      <details>
+        <summary>What the camera measures</summary>
+        <p>
+          Angles and visible fingertip positions are compared with your own
+          reference. For strings, keep the instrument aligned with the grid. The
+          view estimates the nearest string; it cannot verify contact or
+          pressure. Video stays in this browser.
+        </p>
+      </details>
+    </main>
+    <script type="module" src="./camera.mjs"></script>
+  </body>
+</html>

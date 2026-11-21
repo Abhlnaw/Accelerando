@@ -1,44 +1,76 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test from "node:test";
-import {grade, gradeGesture, measure, profiles, reference} from "../ui/technique_component/rubric.mjs";
+import {
+  assess,
+  calibrate,
+  leftHand,
+  posture,
+  stringAt,
+  strings,
+} from "../ui/technique_component/tracking.mjs";
 
-const repeat = (pair, count) => Array.from({length: count}, () => [...pair]);
+const point = (x, y) => ({ x, y, visibility: 1 });
+const repeat = (v, n) => Array.from({ length: n }, () => [...v]);
 
-test("gesture scores four timed targets and requires evidence in every hold", () => {
-  const a = [0, 90], b = [0, 120];
-  const sequence = [a,b,a,b].flatMap(target => [...Array(4), ...repeat(target, 6)]);
-  assert.equal(gradeGesture(sequence, a, b).score, 100);
-  assert.equal(gradeGesture(repeat(a, 40), a, b).score, 50);
-  assert.equal(gradeGesture(sequence, a, a), null);
-  sequence.fill(null, 4, 7);
-  assert.equal(gradeGesture(sequence, a, b), null);
+test("four tips resolve to independently mapped strings, with ambiguity withheld", () => {
+  const lines = strings(
+    [point(0.1, 0.2), point(0.9, 0.2), point(0.1, 0.5), point(0.9, 0.5)],
+    4,
+  );
+  assert.deepEqual(
+    [0.2, 0.3, 0.4, 0.5].map((y) => stringAt(point(0.5, y), lines, 640, 480)),
+    [1, 2, 3, 4],
+  );
+  for (const p of [point(0.5, 0.25), point(0.01, 0.2), point(0.5, 0.07), null])
+    assert.equal(stringAt(p, lines, 640, 480), null);
 });
-
-test("calibration rejects sparse and unstable poses, and handles angle wraparound", () => {
-  assert.equal(reference(repeat([0, 0], 7)), null);
-  assert.equal(reference([...repeat([10, 20], 6), ...repeat([40, 60], 6)]), null);
-  const base = reference([...repeat([179, 90], 6), ...repeat([-179, 90], 6)]);
-  assert.equal(grade(repeat([-179, 90], 40), base).score, 100);
+test("only a single hand identifiable by the anatomical left wrist is used", () => {
+  const p = [];
+  p[11] = point(0.7, 0.4);
+  p[12] = point(0.3, 0.4);
+  p[15] = point(0.8, 0.5);
+  p[16] = point(0.2, 0.5);
+  const left = [point(0.81, 0.49)],
+    right = [point(0.21, 0.49)];
+  assert.equal(leftHand([right, left], p, 640, 480), left);
+  assert.equal(leftHand([left, left], p, 640, 480), null);
+  p[16] = p[15];
+  assert.equal(leftHand([left], p, 640, 480), null);
 });
-
-test("grade uses both angle errors equally and withholds sparse evidence", () => {
-  const base = [0, 90];
-  assert.equal(grade(repeat(base, 27), base), null);
-  assert.equal(grade(repeat([5, 85], 28), base).score, 100);
-  assert.equal(grade(repeat([25, 90], 40), base).score, 50);
-  assert.equal(grade(repeat([15, 75], 40), base).score, 50);
+test("both elbows are assessed together and an occlusion affects only its own metric", () => {
+  const p = [];
+  for (const [i, x, y] of [
+    [11, 0.6, 0.25],
+    [12, 0.4, 0.25],
+    [13, 0.6, 0.5],
+    [14, 0.4, 0.5],
+    [15, 0.7, 0.5],
+    [16, 0.3, 0.5],
+    [23, 0.6, 0.8],
+    [24, 0.4, 0.8],
+    [7, 0.55, 0.14],
+    [8, 0.45, 0.14],
+  ])
+    p[i] = point(x, y);
+  assert.deepEqual(posture(p, 640, 480), [0, 0, 0, 90, 90]);
+  p[15].visibility = 0.2;
+  assert.deepEqual(posture(p, 640, 480), [0, 0, 0, null, 90]);
 });
-
-test("instrument mode measures the selected elbow in pixels and rejects occlusion", () => {
-  const points = [];
-  for (const [i,x,y] of [[12,.2,.25],[11,.6,.25],[13,.6,.6],[15,.8,.6]]) {
-    points[i] = {x,y,visibility:1};
-  }
-  assert.deepEqual(measure(points, 640, 480, profiles.keys, "left"), [0,90]);
-  assert.equal(measure(points, 640, 480, profiles.keys, "right"), null);
-  points[15].visibility = .3;
-  assert.equal(measure(points, 640, 480, profiles.keys, "left"), null);
-  points[7] = {x:.6,y:.15,visibility:1};
-  points[8] = {x:.4,y:.15,visibility:1};
-  assert.deepEqual(measure(points, 640, 480, profiles.voice, "left"), [0,0]);
+test("grades compare each visible angle and each calibrated finger separately", () => {
+  const a = [0, 0, 0, 90, 90, 1, 2, null, 4];
+  assert.deepEqual(calibrate(repeat(a, 9), 9), a);
+  assert.deepEqual(
+    assess(repeat([0, 25, 15, 90, null, 2, 2, null, 4], 40), a),
+    [100, 0, 50, 100, null, 0, 100, null, 100],
+  );
+  assert.ok(assess(repeat(a, 27), a).every((v) => v === null));
+});
+test("a finger changing strings can define a gesture and every cue requires evidence", () => {
+  const a = [0, 0, 0, 90, 90, 1],
+    b = [0, 0, 0, 90, 90, 2];
+  const slots = [a, b, a, b].flatMap((row) => repeat(row, 10));
+  assert.deepEqual(assess(slots, a, b), [100, 100, 100, 100, 100, 100]);
+  assert.equal(assess(repeat(a, 40), a, b)[5], 50);
+  for (let i = 4; i < 7; i++) slots[i][5] = null;
+  assert.equal(assess(slots, a, b)[5], null);
 });

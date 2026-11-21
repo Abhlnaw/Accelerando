@@ -1,188 +1,508 @@
-import {profiles, measure, reference, grade, gradeGesture, poseDistance} from "./rubric.mjs";
+﻿import {
+  bodyNames,
+  fingerNames,
+  visible,
+  posture,
+  strings,
+  stringAt,
+  leftHand,
+  calibrate,
+  assess,
+  delta,
+} from "./tracking.mjs";
 
-const byId = id => document.getElementById(id);
-const profile = byId("profile"), side = byId("side"), video = byId("video");
-const overlay = byId("overlay"), ctx = overlay.getContext("2d");
-const status = byId("status"), result = byId("result");
-let generation = 0, model, stream, timer, phase = "off", phaseStart, lastSlot, lastFrame;
-let samples = [], base, second, slots = [];
-const exercise = byId("exercise");
-
-function message(type, payload = {}) {
-  window.parent.postMessage({isStreamlitMessage: true, type: "streamlit:" + type, ...payload}, "*");
+const el = (id) => document.getElementById(id);
+const video = el("video"),
+  canvas = el("overlay"),
+  ctx = canvas.getContext("2d");
+const profile = el("profile"),
+  exercise = el("exercise"),
+  count = el("count");
+for (const [key, name] of Object.entries({
+  voice: "Voice",
+  keys: "Keyboard",
+  plucked: "Guitar or bass",
+  bowed: "Bowed strings",
+  wind: "Wind or brass",
+  other: "Other instrument",
+}))
+  profile.add(new Option(name, key));
+const stringMode = () => ["plucked", "bowed"].includes(profile.value);
+const names = () => (stringMode() ? [...bodyNames, ...fingerNames] : bodyNames);
+let phase = "off",
+  token = 0,
+  poseModel,
+  handModel,
+  stream,
+  timer,
+  startTime,
+  lastFrame,
+  lastSlot,
+  rows = [],
+  a,
+  b,
+  board = [],
+  crop = { x: 0, y: 0, z: 1 };
+const marks = [
+  "Tap string 1 near the nut",
+  "Tap string 1 toward the bridge",
+  "Tap the last string near the nut",
+  "Tap the last string toward the bridge",
+];
+function message(type, data = {}) {
+  window.parent.postMessage(
+    { isStreamlitMessage: true, type: "streamlit:" + type, ...data },
+    "*",
+  );
 }
-message("componentReady", {apiVersion: 1});
-new ResizeObserver(() => message("setFrameHeight", {height: document.querySelector("main").offsetHeight + 4}))
-  .observe(document.querySelector("main"));
-for (const [value, entry] of Object.entries(profiles)) profile.add(new Option(entry.label, value));
-function updateProfile() {
-  byId("cue").textContent = exercise.value === "steady" ? profiles[profile.value].cue :
-    "Choose two comfortable positions relevant to your phrase. Use the camera guides to see which angles will be tracked.";
-  byId("sideLabel").hidden = !!profiles[profile.value].head;
-  result.textContent = "";
+message("componentReady", { apiVersion: 1 });
+new ResizeObserver(() =>
+  message("setFrameHeight", {
+    height: document.querySelector("main").offsetHeight + 4,
+  }),
+).observe(document.querySelector("main"));
+function cue(title, hint = "", seconds = null) {
+  if (el("status").textContent !== title) el("status").textContent = title;
+  el("hint").textContent = hint;
+  el("clock").textContent = seconds === null ? "" : Math.ceil(seconds) + " s";
 }
-profile.onchange = updateProfile;
-side.onchange = updateProfile;
-exercise.onchange = updateProfile;
-updateProfile();
-
-function closeCamera(text = "") {
-  generation++;
+function layout() {
+  el("fingerBox").hidden = el("stringsLabel").hidden = !stringMode();
+  el("result").textContent = "";
+  for (const [id, labels] of [
+    ["body", bodyNames],
+    ["fingers", fingerNames],
+  ]) {
+    el(id).replaceChildren(
+      ...labels.map((name) => {
+        const box = document.createElement("span"),
+          label = document.createElement("strong"),
+          value = document.createElement("small");
+        label.textContent = name;
+        value.textContent = "—";
+        box.append(label, value);
+        return box;
+      }),
+    );
+  }
+}
+profile.onchange = () => {
+  count.value = profile.value === "plucked" ? "6" : "4";
+  layout();
+};
+exercise.onchange = layout;
+layout();
+function cards(values) {
+  document
+    .querySelectorAll(".cards small")
+    .forEach((node, i) => (node.textContent = values[i] ?? "Out of view"));
+}
+function close(title, hint = "") {
+  token++;
   clearInterval(timer);
-  if (stream) stream.getTracks().forEach(track => track.stop());
+  stream?.getTracks().forEach((t) => t.stop());
   stream = null;
   video.srcObject = null;
-  model?.close();
-  model = null;
-  samples = [];
-  base = null;
-  second = null;
-  slots = [];
+  poseModel?.close();
+  handModel?.close();
+  poseModel = handModel = null;
   phase = "off";
-  byId("preview").hidden = byId("record").hidden = byId("stop").hidden = true;
-  byId("start").hidden = profile.disabled = side.disabled = exercise.disabled = false;
-  status.textContent = text;
+  board = [];
+  rows = [];
+  a = b = null;
+  for (const id of ["preview", "record", "stop", "remap"]) el(id).hidden = true;
+  el("start").hidden =
+    profile.disabled =
+    exercise.disabled =
+    count.disabled =
+      false;
+  cue(title, hint);
 }
 function begin(next, now) {
   phase = next;
-  phaseStart = now;
+  startTime = now;
+  rows = [];
   lastSlot = -1;
-  samples = [];
+  el("remap").hidden = true;
 }
-function draw(points) {
-  overlay.width = video.videoWidth;
-  overlay.height = video.videoHeight;
-  if (!points) return;
-  ctx.strokeStyle = "#79ffd5";
-  ctx.lineWidth = 4;
-  const links = profiles[profile.value].head ? [[7,8],[11,12]] :
-    (side.value === "left" ? [[11,12],[11,13],[13,15]] : [[11,12],[12,14],[14,16]]);
-  for (const [a,b] of links) {
-    if (Math.min(points[a].visibility, points[b].visibility) < 0.7) continue;
+function draw(points, hand, lines) {
+  const w = video.videoWidth,
+    h = video.videoHeight;
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  }
+  // Infer on the full sensor frame; only the displayed crop follows the musician.
+  const visiblePoints = [
+    ...(points ?? []).filter(
+      (p, i) =>
+        [0, 7, 8, 11, 12, 13, 14, 15, 16, 23, 24].includes(i) && visible(p),
+    ),
+    ...(hand ?? []),
+    ...board,
+  ];
+  let z = 1,
+    x = 0,
+    y = 0;
+  if (points && visiblePoints.length && !(stringMode() && board.length < 4)) {
+    const xs = visiblePoints.map((p) => p.x),
+      ys = visiblePoints.map((p) => p.y);
+    const lo = Math.min(...xs),
+      hi = Math.max(...xs),
+      top = Math.min(...ys),
+      bottom = Math.max(...ys);
+    z = Math.max(
+      1,
+      Math.min(1.65, 1 / (hi - lo + 0.18), 1 / (bottom - top + 0.18)),
+    );
+    const edge = 1 - 1 / z;
+    x = Math.max(0, Math.min(edge, (lo + hi) / 2 - 0.5 / z));
+    y = Math.max(0, Math.min(edge, (top + bottom) / 2 - 0.5 / z));
+  }
+  for (const [key, value] of Object.entries({ x, y, z }))
+    crop[key] += (value - crop[key]) * 0.24;
+  ctx.setTransform(
+    crop.z,
+    0,
+    0,
+    crop.z,
+    -crop.x * w * crop.z,
+    -crop.y * h * crop.z,
+  );
+  ctx.drawImage(video, 0, 0, w, h);
+  const line = (p, q, color) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(points[a].x * overlay.width, points[a].y * overlay.height);
-    ctx.lineTo(points[b].x * overlay.width, points[b].y * overlay.height);
+    ctx.moveTo(p.x * w, p.y * h);
+    ctx.lineTo(q.x * w, q.y * h);
     ctx.stroke();
+  };
+  for (const [i, j] of [
+    [7, 8],
+    [11, 12],
+    [11, 13],
+    [13, 15],
+    [12, 14],
+    [14, 16],
+    [11, 23],
+    [12, 24],
+    [23, 24],
+  ])
+    if (visible(points?.[i]) && visible(points?.[j]))
+      line(points[i], points[j], "#64f4be");
+  for (const [p, q] of lines) line(p, q, "#ffdb69");
+  for (const p of [
+    ...board,
+    ...(hand ? [8, 12, 16, 20].map((i) => hand[i]) : []),
+  ]) {
+    ctx.fillStyle = "#ffac54";
+    ctx.beginPath();
+    ctx.arc(p.x * w, p.y * h, 4, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+}
+canvas.onclick = (e) => {
+  if (phase !== "preview" || !stringMode() || board.length >= 4) return;
+  const r = canvas.getBoundingClientRect();
+  board.push({
+    x: crop.x + (1 - (e.clientX - r.left) / r.width) / crop.z,
+    y: crop.y + (e.clientY - r.top) / r.height / crop.z,
+  });
+  if (board.length === 4) {
+    const [p, q, r, s] = board;
+    const cross = (a, b, c) =>
+      (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    const corners = [p, q, s, r];
+    const turns = corners.map((v, i) =>
+      cross(v, corners[(i + 1) % 4], corners[(i + 2) % 4]),
+    );
+    const areaOK =
+      turns.every((t) => t > 0.001) || turns.every((t) => t < -0.001);
+    const lines = strings(board, +count.value);
+    const spacingOK = [0, 1].every(
+      (k) =>
+        Math.hypot(
+          (lines[1][k].x - lines[0][k].x) * canvas.width,
+          (lines[1][k].y - lines[0][k].y) * canvas.height,
+        ) >= 4,
+    );
+    if (!areaOK || !spacingOK) {
+      board = [];
+      el("result").textContent =
+        "Grid too narrow or crossed. Bring the fingerboard closer and mark both outer strings again.";
+    } else el("result").textContent = "";
+  }
+};
+el("remap").onclick = () => {
+  board = [];
+  el("result").textContent = "";
+};
+function finish() {
+  const scores = assess(rows, a, b);
+  const practiceCues = [
+    "Watch the line between your shoulders as you repeat the phrase.",
+    "Use the ear markers to return to your chosen head angle.",
+    "Watch how your shoulders line up over your hips during the phrase.",
+    "Repeat slowly and match your left elbow to its calibrated bend.",
+    "Repeat slowly and match your right elbow to its calibrated bend.",
+  ];
+  const bestTargets = a.map((v, i) =>
+    i < 5 || v === null
+      ? ""
+      : b && b[i] !== null
+        ? " · S" + v + " / S" + b[i]
+        : " · S" + v,
+  );
+  const overall = scores.slice(0, 5).filter(Number.isFinite);
+  close("Check complete");
+  cards(
+    scores.map((s, i) =>
+      s === null ? "Too little evidence" : s + "/100" + bestTargets[i],
+    ),
+  );
+  const weakest = scores
+    .slice(0, 5)
+    .reduce((k, v, i) => (v !== null && (k < 0 || v < scores[k]) ? i : k), -1);
+  el("result").textContent =
+    overall.length < 2
+      ? "Too little posture evidence. Reframe and retry."
+      : "Posture: " +
+        Math.round(overall.reduce((x, y) => x + y, 0) / overall.length) +
+        "/100 · " +
+        overall.length +
+        "/5 areas assessed" +
+        (weakest >= 0 && scores[weakest] < 95
+          ? "\n" + practiceCues[weakest]
+          : "");
+  if (stringMode()) {
+    const vals = scores.slice(5).filter(Number.isFinite);
+    el("result").textContent +=
+      "\nLeft-hand placement: " +
+      (vals.length
+        ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length) +
+          "/100 · " +
+          vals.length +
+          "/4 fingers assessed"
+        : "too little evidence");
   }
 }
 function tick() {
-  const now = performance.now();
-  const calibration = phase === "reference" || phase === "second";
-  const elapsed = now - phaseStart;
-  const duration = calibration ? 3000 : 10000;
+  const now = performance.now(),
+    elapsed = now - startTime;
+  const calibrating = ["reference", "second"].includes(phase),
+    playing = phase === "playing";
   if (phase === "setupB") {
+    cue(
+      "Move to position B",
+      "Prepare your second reference.",
+      (2500 - elapsed) / 1000,
+    );
     if (elapsed >= 2500) begin("second", now);
-    else status.textContent = "Move into position B and hold it.";
-    return;
-  }
-  if (phase !== "preview" && elapsed >= duration) {
-    if (calibration) {
-      const position = reference(samples);
-      if (!position) return closeCamera("Reference unclear. Face the camera, keep the marked joints visible and hold your position for three seconds. Then try again.");
-      if (phase === "reference") {
-        base = position;
-        if (exercise.value === "gesture") { begin("setupB", now); return; }
-      } else {
-        second = position;
-        if (poseDistance(base, second) < 12) return closeCamera("The two poses look too similar from this angle. Adjust the framing or choose a more visible gesture.");
+  } else if (calibrating && elapsed >= 3000) {
+    const ref = calibrate(rows, names().length);
+    if (ref.slice(0, 5).filter(Number.isFinite).length < 2)
+      return close(
+        "Reference unclear",
+        "Hold still with at least two posture areas visible.",
+      );
+    if (phase === "reference") {
+      a = ref;
+      if (exercise.value === "gesture") {
+        begin("setupB", now);
+        return;
       }
-      begin("playing", now);
-      status.textContent = "Play or sing now (10 seconds).";
-      return;
+    } else {
+      b = ref;
+      if (
+        !b.some(
+          (v, i) =>
+            Number.isFinite(v) &&
+            Number.isFinite(a[i]) &&
+            (i < 5 ? delta(a[i], v) >= 12 : a[i] !== v),
+        )
+      )
+        return close("Positions too similar", "Choose a more visible gesture.");
     }
-    const gesture = exercise.value === "gesture";
-    const assessed = gesture ? gradeGesture(slots, base, second) : grade(samples, base);
-    const count = samples.length;
-    closeCamera("Camera stopped.");
-    if (!assessed) {
-      result.textContent = "Too little visible movement data to grade. Improve the light and framing, then try again.";
-      return;
-    }
-    if (gesture) {
-      result.textContent = ["Gesture accuracy: " + assessed.score + "/100",
-        ...assessed.cues.map((cue,i) => "Cue " + (i+1) + " (" + (i%2 ? "B" : "A") + "): on target in " + cue.reached + "/" + cue.visible + " visible samples."),
-        assessed.score === 100 ? "You reached both positions on all four cues." :
-          "Repeat the gesture and watch the guide during the cue you missed most often."].join("\n");
-      return;
-    }
-    const labels = ["Shoulder tilt", profiles[profile.value].head ? "Head tilt" : "Elbow bend"];
-    const largest = assessed.metrics[0].error >= assessed.metrics[1].error ? 0 : 1;
-    result.textContent = ["Form consistency: " + assessed.score + "/100",
-      ...assessed.metrics.map((m,i) => labels[i] + ": " + Math.round(m.score) + "/100, average change " + m.error.toFixed(1) + "°"),
-      "Assessed " + count + "/40 samples.",
-      assessed.metrics[largest].error > 5
-        ? "On your next take, watch your " + labels[largest].toLowerCase() + " during the held phrase. If the movement was intentional, choose a different exercise."
-        : "Your angles stayed close to your reference on average. Try the same setup on another held phrase."
-    ].join("\n");
+    begin("playing", now);
     return;
+  } else if (playing && elapsed >= 10000) {
+    finish();
+    return;
+  } else if (calibrating)
+    cue(
+      "HOLD STILL · " + (phase === "second" ? "B" : "A"),
+      "Calibrating. Wait for the play cue.",
+      (3000 - elapsed) / 1000,
+    );
+  else if (playing) {
+    const gesture = exercise.value === "gesture";
+    cue(
+      (profile.value === "voice" ? "SING" : "PLAY") +
+        (gesture
+          ? " · Position " + (Math.floor(elapsed / 2500) % 2 ? "B" : "A")
+          : " NOW"),
+      gesture
+        ? "Cue " + (1 + Math.floor(elapsed / 2500)) + " of 4"
+        : "Match your calibrated position.",
+      gesture ? (2500 - (elapsed % 2500)) / 1000 : (10000 - elapsed) / 1000,
+    );
   }
-  const remaining = Math.ceil((duration - elapsed) / 1000);
-  if (calibration) status.textContent = "Hold position " + (phase === "second" ? "B" : "A") + ": " + remaining + " s";
-  else if (phase === "playing") status.textContent = exercise.value === "gesture"
-    ? "Cue " + (Math.floor(elapsed / 2500) + 1) + " of 4: move to " + (Math.floor(elapsed / 2500) % 2 ? "B" : "A") + " and hold."
-    : "Play or sing: " + remaining + " s";
   if (video.readyState < 2 || video.currentTime === lastFrame) return;
   lastFrame = video.currentTime;
   const slot = Math.floor(elapsed / 250);
-  if (phase !== "preview" && slot === lastSlot) return;
+  if ((playing || calibrating) && slot === lastSlot) return;
   lastSlot = slot;
   try {
-    const poses = model.detectForVideo(video, now).landmarks;
-    const points = poses.length === 1 ? poses[0] : null;
-    draw(points);
-    const value = measure(points, video.videoWidth, video.videoHeight, profiles[profile.value], side.value);
+    const detected = poseModel.detectForVideo(video, now).landmarks;
+    const pose = detected.length === 1 ? detected[0] : null;
+    const hand =
+      handModel && pose
+        ? leftHand(
+            handModel.detectForVideo(video, now).landmarks,
+            pose,
+            video.videoWidth,
+            video.videoHeight,
+          )
+        : null;
+    const lines = strings(board, +count.value);
+    draw(pose, hand, lines);
+    const values = posture(pose, canvas.width, canvas.height);
+    if (stringMode())
+      values.push(
+        ...[8, 12, 16, 20].map((i) =>
+          stringAt(hand?.[i], lines, canvas.width, canvas.height),
+        ),
+      );
+    const target = playing && (b && Math.floor(elapsed / 2500) % 2 ? b : a);
+    cards(
+      values.map((v, i) => {
+        if (v === null) return i < 5 ? "Out of view" : "Unclear";
+        const label = i >= 5 ? "String " + v : Math.round(v) + "°";
+        if (!target || !Number.isFinite(target[i])) return label;
+        return (
+          label +
+          (i >= 5
+            ? v === target[i]
+              ? " · matched"
+              : " · aim for S" + target[i]
+            : " · " + Math.round(delta(v, target[i])) + "° from target")
+        );
+      }),
+    );
     if (phase === "preview") {
-      byId("record").disabled = !value;
-      status.textContent = value ? "Ready. Start the check and hold your reference position for three seconds." : "Frame one musician with all marked joints visible.";
-    } else if (value) {
-      samples.push(value);
-      if (phase === "playing") slots[slot] = value;
-    }
+      const mapNeeded = stringMode() && board.length < 4;
+      el("record").disabled =
+        mapNeeded || values.slice(0, 5).filter(Number.isFinite).length < 2;
+      cue(
+        mapNeeded
+          ? marks[board.length]
+          : el("record").disabled
+            ? "Step into view"
+            : "Ready to calibrate",
+        mapNeeded
+          ? "Mark the same section at both ends. Keep the instrument still."
+          : stringMode()
+            ? values.slice(5).some(Number.isFinite)
+              ? "Keep the strings aligned with the grid."
+              : "No clear fingertip on a string. Bring the left hand closer or remap the grid."
+            : "Keep your upper body in frame.",
+      );
+    } else if (calibrating || playing) rows[slot] = values;
   } catch {
-    closeCamera("Pose tracking stopped. Re-enable the camera to retry.");
+    close("Tracking stopped", "Enable the camera to retry.");
   }
 }
-byId("start").onclick = async () => {
-  const token = ++generation;
+el("start").onclick = async () => {
+  const current = ++token;
   phase = "opening";
-  result.textContent = "";
-  byId("start").hidden = profile.disabled = side.disabled = exercise.disabled = true;
-  byId("stop").hidden = false;
-  status.textContent = "Opening camera…";
+  layout();
+  crop = { x: 0, y: 0, z: 1 };
+  el("start").hidden =
+    profile.disabled =
+    exercise.disabled =
+    count.disabled =
+      true;
+  el("stop").hidden = false;
+  cue("Opening camera");
   try {
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error("Open the studio on localhost or HTTPS to use a webcam.");
-    const acquired = await navigator.mediaDevices.getUserMedia({video: {width: {ideal: 640}, height: {ideal: 480}}, audio: false});
-    if (generation !== token) { acquired.getTracks().forEach(track => track.stop()); return; }
+    const acquired = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 960 }, height: { ideal: 720 } },
+      audio: false,
+    });
+    if (token !== current) {
+      acquired.getTracks().forEach((t) => t.stop());
+      return;
+    }
     stream = acquired;
-    stream.getVideoTracks()[0].onended = () => { if (token === generation) closeCamera("Camera disconnected."); };
+    stream.getVideoTracks()[0].onended = () => {
+      if (current === token) close("Camera disconnected");
+    };
     video.srcObject = stream;
     await video.play();
-    if (token !== generation) return;
-    byId("preview").hidden = false;
-    status.textContent = "Loading the local pose model…";
-    const {PoseLandmarker} = await import("./vendor/vision_bundle.mjs");
-    if (token !== generation) return;
-    const asset = name => new URL("./vendor/" + name, import.meta.url).href;
-    const loaded = await PoseLandmarker.createFromOptions({
+    if (current !== token) return;
+    cue("Loading tracking");
+    const { PoseLandmarker, HandLandmarker } = await import(
+      "./vendor/vision_bundle.mjs"
+    );
+    const asset = (n) => new URL("./vendor/" + n, import.meta.url).href;
+    const files = {
       wasmLoaderPath: asset("vision_wasm_nosimd_internal.js"),
       wasmBinaryPath: asset("vision_wasm_nosimd_internal.wasm"),
-    }, {baseOptions: {modelAssetPath: asset("pose_landmarker_lite.task")}, runningMode: "VIDEO", numPoses: 2});
-    if (generation !== token) { loaded.close(); return; }
-    model = loaded;
+    };
+    const options = (name) => ({
+      baseOptions: { modelAssetPath: asset(name) },
+      runningMode: "VIDEO",
+    });
+    for (const [type, opts] of [
+      [
+        PoseLandmarker,
+        { ...options("pose_landmarker_lite.task"), numPoses: 2 },
+      ],
+      ...(stringMode()
+        ? [
+            [
+              HandLandmarker,
+              { ...options("hand_landmarker.task"), numHands: 2 },
+            ],
+          ]
+        : []),
+    ]) {
+      if (current !== token) return;
+      const model = await type.createFromOptions(files, opts);
+      if (current !== token) {
+        model.close();
+        return;
+      }
+      if (type === PoseLandmarker) poseModel = model;
+      else handModel = model;
+    }
     phase = "preview";
     lastFrame = -1;
-    byId("record").hidden = false;
-    byId("record").disabled = true;
+    el("preview").hidden = el("record").hidden = false;
+    el("record").disabled = true;
+    el("remap").hidden = !stringMode();
     timer = setInterval(tick, 125);
-  } catch (error) {
-    if (token === generation) closeCamera(error.name === "NotAllowedError"
-      ? "Camera permission was denied. Allow camera access in the browser and try again."
-      : "Could not start the camera or pose model. " + error.message);
+  } catch (e) {
+    if (token === current)
+      close(
+        "Camera unavailable",
+        e.name === "NotAllowedError"
+          ? "Allow camera access and retry."
+          : e.message,
+      );
   }
 };
-byId("record").onclick = () => { byId("record").hidden = true; begin("reference", performance.now()); };
-byId("stop").onclick = () => closeCamera("Camera stopped.");
-window.addEventListener("pagehide", () => closeCamera());
+el("record").onclick = () => {
+  el("record").hidden = true;
+  begin("reference", performance.now());
+  cue("HOLD STILL · A", "Calibrating. Wait for the play cue.", 3);
+};
+el("stop").onclick = () => {
+  close("Camera stopped");
+  layout();
+};
+window.addEventListener("pagehide", () => close(""));
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden && phase !== "off") closeCamera("Camera stopped when you left the page.");
+  if (document.hidden && phase !== "off") close("Camera stopped");
 });
