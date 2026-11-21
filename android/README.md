@@ -11,7 +11,8 @@ No laptop server, Python installation, login or API key is needed on the tablet.
 2. Connect the tablet to the PC by USB and select **File transfer** on the tablet.
 3. Copy the APK to the tablet's Downloads folder. Open **My Files → Downloads**,
    tap the APK, and allow My Files to install this app if prompted. Tap Install.
-4. Open **Accelerando**. Choose your instrument. Twinkle is bundled; no score
+4. Open **Accelerando**. Home shows your saved music, practice totals and recent
+   reports. Select **Continue practice**, then choose your instrument. Twinkle is bundled; no score
    download is necessary. Keep **Score / instrument default** selected for this
    bundled arrangement, including guitar's written-to-sounding octave shift.
 5. Tap **Start practice** and allow microphone access. Wait for **I'm listening**.
@@ -35,7 +36,8 @@ This build has not yet been tested with the physical Tab S7 FE microphone.
 
 - **Music library → Import MusicXML** accepts an uncompressed partwise `.musicxml`
   or `.xml` file, up to 5 MB. Select the relevant part in a multiple-part score.
-  Uploads are for the current session; practice reports persist.
+  Imported scores and the selected part/instrument settings persist across restarts.
+  The library has a 4-million-character storage budget and rejects additions if full.
 - **Upload a take** runs on-device inference on an uncompressed PCM16 WAV, mono
   or stereo, 8–96 kHz, at most 25 MB / 3 minutes. It uses the currently selected
   score and passage.
@@ -51,7 +53,9 @@ profiles. Profiles handle notation transposition; they are not separate trained
 instrument models. Chords, overlapping voices, ensembles, percussion, automatic
 PDF recognition, compressed MXL and game mechanics are not implemented. The app
 rejects unsupported scores instead of assigning fabricated note assessments.
-It retains the most recent take's audio for replay; older reports retain metrics.
+It retains the latest 20 recordings with independent IDs for report replay;
+older reports retain metrics and clearly report unavailable audio. Up to 500
+practice reports are kept. Export the practice log to keep a separate copy.
 
 ## Build on Windows
 
@@ -83,14 +87,20 @@ Copy-Item android/tools/node_modules/vexflow/build/cjs/vexflow.js android/app/sr
 ```powershell
 node --test tests/mobile/*.test.cjs
 .\.venv\Scripts\python.exe -m pytest -q
+.\android\gradlew.bat -p android testDebugUnitTest
+.\android\gradlew.bat -p android connectedDebugAndroidTest
 .\android\gradlew.bat -p android assembleDebug
 ```
 
-The mobile logic checks cover instrument transposition, score parts, ties/rests,
-alignment recovery, uncertainty, tempo modes, history and note grouping. The
+The JavaScript checks cover controller flows, persistence, transposition, score
+parts, ties/rests, alignment recovery, uncertainty, tempo modes and note grouping.
+JVM checks validate the native PCM decoder. Android instrumentation checks require
+an emulator or test device and exercise actual WebView notation, JNI neural
+inference, native score/WAV imports, report saving, replay file identity and restart.
+Microphone quality and live latency still require a physical tablet test. The
 ONNX export checks seven pitches against the original PyTorch network; measured
 maximum activation difference is saved in `app/src/main/assets/model-info.json`.
-Compilation and desktop tests do not establish microphone accuracy or latency
+Compilation and emulator tests do not establish microphone accuracy or latency
 on the tablet. Live markings are provisional and can change as later notes
 clarify alignment. The app reports measured inference time during recording.
 

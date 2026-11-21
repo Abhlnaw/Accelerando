@@ -14,7 +14,7 @@ final class PitchEngine implements AutoCloseable {
     interface Listener { void frame(double seconds, double midi, double confidence, double rms, double ms, boolean clipped); }
     private final OrtEnvironment environment;
     private final OrtSession session;
-    private volatile boolean running;
+    private volatile boolean running=true;
     private volatile AudioRecord recorder;
     private final float[] window = new float[1024];
     private long samples;
@@ -36,12 +36,12 @@ final class PitchEngine implements AutoCloseable {
 
     @SuppressWarnings("MissingPermission")
     void record(Listener listener) throws Exception {
-        running = true;
+        if(!running)return;
         int rate = 48000;
         int minimum = AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
         recorder = new AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, rate,
                 AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, Math.max(minimum, 48000));
-        if (recorder.getState() != AudioRecord.STATE_INITIALIZED) throw new IOException("Microphone could not initialize. Close other recording apps and retry.");
+        if (recorder.getState() != AudioRecord.STATE_INITIALIZED) {recorder.release();recorder=null;throw new IOException("Microphone could not initialize. Close other recording apps and retry.");}
         short[] chunk = new short[1536];
         try {
             recorder.startRecording();
@@ -62,6 +62,7 @@ final class PitchEngine implements AutoCloseable {
     }
 
     void stop() { running = false; }
+    double durationSeconds(){return samples/16000.0;}
 
     void sample(float value, Listener listener) throws Exception {
         System.arraycopy(window, 1, window, 0, 1023);
@@ -109,28 +110,10 @@ final class PitchEngine implements AutoCloseable {
 
     /** PCM16 WAV import, including stereo; preserve source seconds when resampling. */
     void analyzeWav(byte[] data, Listener listener) throws Exception {
-        if(data.length<44 || !new String(data,0,4).equals("RIFF") || !new String(data,8,4).equals("WAVE"))
-            throw new IOException("Upload an uncompressed 16-bit PCM WAV recording.");
-        int rate=0,channels=0,bits=0,format=0,offset=0,length=0;
-        for(int p=12;p+8<=data.length;) {
-            int size=integer(data,p+4,4); if(size<0||size>data.length-p-8)throw new IOException("Incomplete WAV file.");
-            String id=new String(data,p,4);
-            if(id.equals("fmt ")&&size>=16){format=integer(data,p+8,2);channels=integer(data,p+10,2);rate=integer(data,p+12,4);bits=integer(data,p+22,2);}
-            if(id.equals("data")){offset=p+8;length=size;}
-            p+=8+size+(size&1);
-        }
-        if(format!=1||bits!=16||channels<1||channels>2||rate<8000||rate>96000||length==0)
-            throw new IOException("Export as a mono or stereo 16-bit PCM WAV, 8–96 kHz.");
-        int frames=length/(2*channels);
-        if(frames/(double)rate>180)throw new IOException("Trim the recording to 3 minutes or less.");
-        running=true;
-        for(int i=0;i<(long)frames*16000/rate&&running;i++) {
-            double position=i*rate/16000.0;int a=(int)position,b=Math.min(a+1,frames-1);float va=0,vb=0;
-            for(int c=0;c<channels;c++) {va+=(short)integer(data,offset+2*(a*channels+c),2)/32768f/channels;vb+=(short)integer(data,offset+2*(b*channels+c),2)/32768f/channels;}
-            sample((float)(va+(vb-va)*(position-a)),listener);
-        }
+        WavInput input=WavInput.parse(data);
+        if(!running)return;
+        for(int i=0;i<input.samples16k()&&running;i++)sample(input.sample16k(i),listener);
         running=false;
     }
-    private static int integer(byte[] b,int p,int count) {int n=0;for(int j=0;j<count;j++)n|=(b[p+j]&255)<<(8*j);return n;}
     @Override public void close() throws OrtException { session.close(); }
 }
