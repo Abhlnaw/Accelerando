@@ -109,6 +109,11 @@
   text-decoration: none;
 }
 
+[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] p {
+  white-space: normal;
+  line-height: 1.25;
+}
+
 [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:hover,
 [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"][aria-current="page"] {
   background: #69452e;

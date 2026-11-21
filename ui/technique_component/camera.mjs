@@ -109,6 +109,7 @@ function close(title, hint = "") {
   board = [];
   rows = [];
   a = b = null;
+  layout();
   for (const id of ["preview", "record", "stop", "remap"]) el(id).hidden = true;
   el("start").hidden =
     profile.disabled =
@@ -463,10 +464,7 @@ el("record").onclick = () => {
   begin("reference", performance.now());
   cue("HOLD STILL · A", "Calibrating. Wait for the play cue.", 3);
 };
-el("stop").onclick = () => {
-  close("Camera stopped");
-  layout();
-};
+el("stop").onclick = () => close("Camera stopped");
 window.addEventListener("pagehide", () => close(""));
 document.addEventListener("visibilitychange", () => {
   if (document.hidden && phase !== "off") close("Camera stopped");
