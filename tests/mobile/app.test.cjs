@@ -22,14 +22,37 @@ function boot(persisted=new Map()){
  window.setTimeout=fn=>{fn();return 0;};window.console=console;
  const ctx=vm.createContext({document,DOMParser,Option:window.Option,localStorage:window.localStorage,Android:window.Android,Vex:window.Vex,console,setTimeout:window.setTimeout,addEventListener(){}});
  vm.runInContext('window=globalThis',ctx);
- for(const name of ['core.js','score-lines.js','storage.js','app.js']){try{vm.runInContext(fs.readFileSync(path.join(assets,name),'utf8'),ctx,{filename:name});}catch(error){throw new Error(name+': '+document.getElementById('notice').textContent,{cause:error});}}
+ for(const name of ['core.js','score-lines.js','score-demo.js','storage.js','app.js']){try{vm.runInContext(fs.readFileSync(path.join(assets,name),'utf8'),ctx,{filename:name});}catch(error){throw new Error(name+': '+document.getElementById('notice').textContent,{cause:error});}}
  return {window:ctx,document,calls,persisted,run:code=>vm.runInContext(code,ctx),click:id=>document.getElementById(id).click()};
 }
 const melody=`<score-partwise><work><work-title>My Tune</work-title></work><part id="P1"><measure number="1"><attributes><divisions>1</divisions></attributes>${['C','D','E','F','G','A'].map(s=>`<note><pitch><step>${s}</step><octave>5</octave></pitch><duration>1</duration></note>`).join('')}</measure></part></score-partwise>`;
+test('manual journal sessions retain notes, minutes and recurring mistakes across restarts',()=>{
+ const app=boot();
+ app.run("setPage('progress')");
+ for(const focus of ['Entrance','Ending']){
+   app.document.getElementById('journal-focus').value=focus;
+   app.document.getElementById('journal-notes').value='Repeat slowly';
+   app.document.getElementById('journal-mistake').value='pitch';
+   app.run("$('journal-form').onsubmit({preventDefault(){}})");
+ }
+ const next=boot(app.persisted);
+ next.run("setPage('progress')");
+ assert.match(next.document.getElementById('journal-patterns').textContent,/pitch.*2 sessions/);
+ assert.match(next.document.getElementById('attempts').textContent,/Repeat slowly/);
+ assert.equal(next.run('store.summary().minutes'),30);
+});
 function finish(app,id='take-first',session=1){
  app.run(`window.nativeEvent('loading',{sessionId:${session},message:'Loading'});window.nativeEvent('started',{sessionId:${session}})`);
  app.run(`for(const note of score.notes){for(let i=0;i<16;i++)window.nativeEvent('frame',{sessionId:${session},time:note.onset*.6+i*.032,midi:note.midi,confidence:.95,rms:.1,inferenceMs:4});for(let i=16;i<19;i++)window.nativeEvent('frame',{sessionId:${session},time:note.onset*.6+i*.032,midi:0,confidence:0,rms:0,inferenceMs:0});}window.nativeEvent('stopped',{sessionId:${session},recordingId:'${id}',duration:4});`);
 }
+test('written-tempo cursor waits for sound then advances independently of earned notes',()=>{
+ const app=boot();app.click('home-continue');app.document.getElementById('mode').value='written';app.click('start');
+ app.run("nativeEvent('started',{}); nativeEvent('frame',{time:1,midi:0,confidence:0,rms:0})");
+ assert.equal(app.run('session.clock'),undefined);
+ app.run("for(let i=0;i<70;i++)nativeEvent('frame',{time:1.1+i*.032,midi:score.notes[0].midi,confidence:.62,rms:.001})");
+ assert.equal(app.run('lastAnalysis.matched'),1);
+ assert.notEqual(app.run('lastAnalysis.current'),app.run('score.notes[0].id'));
+});
 test('home is the launch page, with working practice/library/progress navigation',()=>{
  const app=boot();assert.equal(app.document.getElementById('home-page').hidden,false);
  app.click('home-continue');assert.equal(app.document.getElementById('practice-page').hidden,false);assert.ok(app.document.querySelectorAll('#score svg').length>0);
@@ -89,4 +112,16 @@ test('removing a saved score preserves its report and correct recording without 
  const buttons=[...app.document.querySelectorAll('#saved-scores button')];buttons.find(b=>b.textContent==='Remove').click();app.document.querySelector('#remove-score button.primary').click();
  assert.equal(JSON.parse(app.persisted.get('library')).length,0);assert.equal(JSON.parse(app.persisted.get('history')).length,1);
  app.run('openRecord(recordStore[0])');app.document.querySelector('#legacy-report button.secondary').click();assert.deepEqual(app.calls.at(-1),['replay','retained',0]);
+});
+test('selecting first and third measures includes the middle measure',()=>{
+ const app=boot();app.click('home-continue');
+ const measures=app.document.querySelectorAll('#score rect[role=button]');
+ for(const i of [0,2])measures[i].dispatchEvent(new app.document.defaultView.Event('click'));
+ assert.equal(app.run('activeScore().measures.length'),3);
+ assert.equal(app.run('selection.label'), '1'+String.fromCharCode(0x2013)+'3');
+});
+test('microphone finishes once after singing then trailing silence',()=>{
+ const app=boot();app.click('home-continue');app.click('start');
+ app.run("nativeEvent('started',{message:'Listening through the tablet microphone'}); for(let i=0;i<130;i++)nativeEvent('frame',{time:i*.032,midi:60,confidence:i<15?.9:0,rms:i<15?.1:0})");
+ assert.equal(app.calls.filter(c=>c[0]==='stop').length,1);
 });

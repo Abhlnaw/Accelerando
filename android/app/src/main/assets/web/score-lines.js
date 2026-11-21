@@ -20,16 +20,34 @@
     if (doc.querySelector('repeat, ending, grace, ornaments')) throw Error('Expand repeats, grace notes and ornaments before import.');
     const parts = children(doc.documentElement, 'part');
     const lines = [];
+    const scoreTempos = new Map();
     for (const [index, part] of parts.entries()) {
       if (options.partIndex != null && index !== options.partIndex) continue;
       if (!part.querySelector('pitch')) continue;
       const name = Array.from(doc.querySelectorAll('score-part')).find(n => n.getAttribute('id') === part.getAttribute('id'))?.querySelector('part-name')?.textContent || 'Part '+(index+1);
       const lanes = new Map();
       let divisions = 1;
+      let barStart = 0;
+      const tempos = [];
       const bars = children(part, 'measure').map((measure, mi) => {
         let cursor = 0, end = 0, last = null, passNumber = 1;
         const attributes = [], groups = new Map();
         for (const node of measure.children) {
+          if (node.localName === 'direction' || node.localName === 'sound') {
+            const sound = node.localName === 'sound' ? node : node.querySelector('sound');
+            let bpm = Number(sound?.getAttribute('tempo'));
+            const mark = node.querySelector('metronome');
+            if (!(bpm > 0) && mark) {
+              const beats = {whole:4, half:2, quarter:1, eighth:0.5, '16th':0.25, '32nd':0.125};
+              const unit = beats[mark.querySelector('beat-unit')?.textContent];
+              bpm = Number(mark.querySelector('per-minute')?.textContent) * unit *
+                (2 - 2 ** -mark.querySelectorAll('beat-unit-dot').length);
+            }
+            const offset = Number(node.querySelector('offset')?.textContent || 0) / divisions;
+            if (Number.isFinite(bpm) && bpm > 0 && Number.isFinite(offset))
+              tempos.push({beat:Math.max(0, barStart + cursor / 10080 + offset), bpm});
+            continue;
+          }
           if (node.localName === 'attributes') {
             divisions = Number(node.querySelector('divisions')?.textContent || divisions);
             if (!(divisions > 0)) throw Error('Use positive score divisions.');
@@ -65,8 +83,10 @@
           pitches.push({height,duration,xml:serialize(copy)});
           lanes.set(lane,Math.max(lanes.get(lane)||0,pitches.length));
         }
+        barStart += end / 10080;
         return {groups,end,attributes:attributes.join(''),label:measure.getAttribute('number')||String(mi+1), printed:measure.getAttribute('text')};
       });
+      for (const mark of tempos) scoreTempos.set(mark.beat, mark);
       for (const [lane,depth] of lanes) {
         for (let rank=0; rank<depth; rank++) {
           if (lines.length >= 80) throw Error('Choose a shorter score excerpt for line matching.');
@@ -97,6 +117,7 @@
           const title = doc.querySelector('work-title, movement-title')?.textContent || 'Uploaded piece';
           const projected='<score-partwise><work><work-title>'+escape(title)+'</work-title></work><part id="P1">'+measures+'</part></score-partwise>';
           const score=Coach.parseScore(projected,{...options,partIndex:0,projectedChordLine:depth>1});
+          score.tempos = tempos;
           lines.push({score,label:name+' · '+lane+(depth>1?' · chord tone '+(rank+1)+' from top':'')});
         }
       }
@@ -104,6 +125,7 @@
     if (!lines.length) throw Error('The score contains no pitched notes.');
     const unique=new Map();
     for(const line of lines) {
+      line.score.tempos = Array.from(scoreTempos.values());
       const key=JSON.stringify(line.score.notes.map(n=>[n.measure,n.onset,n.duration,n.midi]));
       if(unique.has(key)) unique.get(key).label+=' / '+line.label;
       else unique.set(key,line);
@@ -111,20 +133,23 @@
     return Array.from(unique.values());
   }
 
-  function choose(lines, events, passage) {
-    const heard=events.filter(e=>e.confidence>=.65);
+  function choose(lines, events, passage, voice=false) {
+    const heard=events.filter(e=>e.confidence>=.60);
     const ranked=lines.map(line=>{
       const notes=line.score.notes.filter(n=>!passage || (n.onset>=passage.onset && n.onset<passage.end));
-      const row=new Uint16Array(heard.length+1);
-      for(const note of notes) {
-        let previous=0;
-        for(let j=1;j<=heard.length;j++) {
-          const old=row[j];
-          row[j]=Math.max(row[j-1],old,previous+Number(Math.abs(heard[j-1].midi-note.midi)<=.65));
-          previous=old;
+      const fits=(voice?[0,12,-12,24,-24]:[0]).map(shift=>{
+        const row=new Uint16Array(heard.length+1);
+        for(const note of notes) {
+          let previous=0;
+          for(let j=1;j<=heard.length;j++) {
+            const old=row[j];
+            row[j]=Math.max(row[j-1],old,previous+Number(Math.abs(heard[j-1].midi+shift-note.midi)<=(voice ? 1.25 : .65)));
+            previous=old;
+          }
         }
-      }
-      return {line,fit:2*row[heard.length]/Math.max(1,notes.length+heard.length)};
+        return row[heard.length];
+      });
+      return {line,fit:2*Math.max(...fits)/Math.max(1,notes.length+heard.length)};
     }).sort((a,b)=>b.fit-a.fit);
     return {line:ranked[0].line,ambiguous:ranked.length>1 && ranked[0].fit-ranked[1].fit<.05};
   }

@@ -41,6 +41,22 @@ public class AppRuntimeTest {
             assertEquals("false",js(scenario,"window.Android.saveData('../bad','[]')"));
         }
     }
+    @Test public void quietLowRegisterReachesTheRecorderOutput()throws Exception{
+        android.content.Context context=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        for(int expected:new int[]{40,45,57}){
+            List<Double> heard=new ArrayList<>();
+            double hz=440*Math.pow(2,(expected-69)/12.0);
+            try(PitchEngine engine=new PitchEngine(context)){
+                for(int i=0;i<16000;i++){
+                    double phase=2*Math.PI*hz*i/16000;
+                    engine.sample((float)(.0005*(Math.sin(phase)+.65*Math.sin(2*phase))),
+                        (t,m,c,r,ms,clip)->{if(c>=.60)heard.add(m);});
+                }
+            }
+            assertTrue("Detect quiet MIDI "+expected,heard.size()>15);
+            Collections.sort(heard);assertEquals(expected,heard.get(heard.size()/2),.5);
+        }
+    }
     @Test public void localNeuralInferenceAndIndependentRecordingsWork()throws Exception{
         android.content.Context context=InstrumentationRegistry.getInstrumentation().getTargetContext();
         List<Double> pitches=new ArrayList<>();List<Double> times=new ArrayList<>();

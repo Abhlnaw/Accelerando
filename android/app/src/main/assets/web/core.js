@@ -24,7 +24,7 @@
   const credit = (error,full,zero) => Math.max(0, Math.min(100,100*(zero-Math.abs(error))/(zero-full)));
   const pitchName = midi => ['C','C♯','D','E♭','E','F','F♯','G','A♭','A','B♭','B'][((Math.round(midi)%12)+12)%12]+(Math.floor(Math.round(midi)/12)-1);
   const frequency = midi => 440*2**((midi-69)/12);
-  function parseScore(xml, {profile='guitar', transpose='score', partIndex=0, projectedChordLine=false,
+  function parseScore(xml, {profile='guitar', transpose='score', partIndex=0, projectedChordLine=false, playbackOnly=false,
                             DOMParser:Parser=globalThis.DOMParser}={}) {
     if(!profiles[profile])throw Error('Choose a supported instrument profile.');
     if (!xml || xml.length>5*1024*1024) throw Error('Choose a MusicXML file smaller than 5 MB.');
@@ -65,7 +65,7 @@
         if(!['note','forward'].includes(item.localName))continue;
         const duration=number(item,'duration',0)/divisions;
         if(duration<=0)throw Error('Each note and rest needs a positive duration.');
-        if(![.125,.25,.375,.5,.75,1,1.5,2,3,4].includes(duration))throw Error('This notation duration is unsupported. Export a melodic excerpt with standard note lengths.');
+        if(!playbackOnly && ![.125,.25,.375,.5,.75,1,1.5,2,3,4].includes(duration))throw Error('This notation duration is unsupported. Export a melodic excerpt with standard note lengths.');
         const rest=item.localName==='forward'||!!child(item,'rest');
         if(rest){if(pending && !projectedChordLine)throw Error('A tie cannot continue through a rest.');pending=null;bar.events.push({rest:true,onset:cursor,duration});cursor+=duration;continue;}
         const p=child(item,'pitch');if(!p)throw Error('Unpitched percussion is not supported by this pitch model.');
@@ -145,9 +145,23 @@
     return path.reverse();
   }
 
-  function assess(score,observations,{partial=false,uncertain=[],mode='expressive',targetBpm=80}={}){
-    const events=observations.filter(e=>e.confidence>=.65), path=align(score.notes,events,partial);
-    const matches=path.filter(p=>p.kind==='match'),anchors=matches.filter(p=>Math.abs(p.note.midi-p.event.midi)<=.65);
+  function assess(score,observations,{partial=false,uncertain=[],mode='expressive',targetBpm=80,voice=false,excerpt=false}={}){
+    let events=observations.filter(e=>e.confidence>=.60);
+    // A consistent small tuning offset can establish song identity. Grade the original pitches.
+    const identityTolerance = voice ? 1.25 : .65;
+    let octaveShift=0;
+    if(voice && events.length){
+      // Use one register for the phrase so individual octave jumps remain audible errors.
+      let best=-1;
+      for(const shift of [0,12,-12,24,-24]){
+        const shifted=events.map(e=>({...e,midi:e.midi+shift}));
+        const hits=align(score.notes,shifted,partial).filter(p=>p.kind==='match'&&Math.abs(p.note.midi-p.event.midi)<=identityTolerance).length;
+        if(hits>best){best=hits;octaveShift=shift;}
+      }
+      if(octaveShift)events=events.map(e=>({...e,midi:e.midi+octaveShift}));
+    }
+    const path=align(score.notes,events,partial);
+    const matches=path.filter(p=>p.kind==='match'),anchors=matches.filter(p=>Math.abs(p.note.midi-p.event.midi)<=identityTolerance);
     const colors={},findings=[],residuals=[],rates=[];let missing=0,extra=0;
     for(const p of matches){const cents=100*(p.event.midi-p.note.midi);colors[p.note.id]=Math.abs(cents)<=35?'correct':'pitch';
       if(Math.abs(cents)>35)findings.push({kind:'pitch',id:p.note.id,measure:p.note.measure,time:p.event.onset,approximate:false,
@@ -173,7 +187,7 @@
       if(unknown||path.some(g=>g.kind==='missing'&&g.index>left.index&&g.index<right.index)||path.some(g=>g.kind==='extra'&&g.event.onset>left.event.onset&&g.event.onset<right.event.onset))continue;
       const before=(p.event.onset-left.event.onset)/(p.note.onset-left.note.onset);
       const after=(right.event.onset-p.event.onset)/(right.note.onset-p.note.onset);
-      if(mode==='expressive'&&right.index===score.notes.length-1&&after>=before*1.5)continue;
+      if(mode!=='guided'&&right.index===score.notes.length-1&&after>=before*1.5)continue;
       const residual=(p.event.onset-expected)/rate;residuals.push(residual);
       if(Math.abs(residual)>.25){if(colors[p.note.id]==='correct')colors[p.note.id]='rhythm';findings.push({kind:'rhythm',id:p.note.id,measure:p.note.measure,time:p.event.onset,
         message:`This entrance was ${Math.abs(residual).toFixed(2)} local beats ${residual>0?'late':'early'}. Tap the neighboring beats, then try the passage again.`});}
@@ -183,23 +197,34 @@
     const coverage=matches.length?100*matches.length/(matches.length+missing+extra):null;
     const rhythm=mean(residuals.map(r=>credit(r,.15,.5)));
     const tempo=bpm?credit((bpm-targetBpm)/targetBpm,.05,.25):null;
-    const sufficient=anchors.length>=Math.min(4,score.notes.length)&&anchors.length>=score.notes.length/2&&fraction>=.75;
+    const sufficient=anchors.length>=Math.min(4,Math.ceil(score.notes.length*.6))&&anchors.length>=score.notes.length/2&&fraction>=.75;
     const components=mode==='guided'?[[pitch,.45],[coverage,.25],[rhythm,.20],[tempo,.10]]:[[pitch,.50],[coverage,.30],[rhythm,.20]];
     const available=components.filter(([v])=>v!==null);
-    const grade=!partial&&sufficient?available.reduce((s,[v,w])=>s+v*w,0)/available.reduce((s,[,w])=>s+w,0):null;
+    const weighted=available.length?available.reduce((s,[v,w])=>s+v*w,0)/available.reduce((s,[,w])=>s+w,0):null;
     const recognizable=partial?anchors.length>=Math.min(3,score.notes.length)&&anchors.length>=matches.length/2:sufficient;
     if(!recognizable)for(const id of Object.keys(colors))if(colors[id]!=='correct')delete colors[id];
+    const grade=!partial&&sufficient?weighted:null;
+    const provisionalGrade=recognizable?weighted:null;
     const current=matches.at(-1)?.note.id||score.notes[0]?.id;
-    return {grade,pitch,coverage,rhythm,tempo:mode==='guided'?tempo:null,bpm,fraction,colors,current,path,findings:recognizable?findings.slice(0,12):[],
+    let passage=null;
+    if(!partial && !excerpt && grade===null && events.length>=4 && events.length<score.notes.length){
+      const prefix=align(score.notes,events,true);
+      const end=prefix.filter(p=>p.kind==='match').at(-1)?.index;
+      if(end>=3 && end+1<score.notes.length && prefix.filter(p=>p.kind==='match'&&Math.abs(p.note.midi-p.event.midi)<=identityTolerance).length>=4){
+        const excerpt=assess({...score,notes:score.notes.slice(0,end+1)},events,{uncertain,mode,targetBpm,voice,excerpt:true});
+        if(excerpt.grade!==null)passage={grade:excerpt.grade,first:score.notes[0].measure,last:score.notes[end].measure,notes:end+1};
+      }
+    }
+    return {grade,provisionalGrade,passage,octaveShift,pitch,coverage,rhythm,tempo:mode==='guided'?tempo:null,bpm,fraction,colors,current,path,findings:recognizable?findings.slice(0,12):[],
       status:sufficient?'ok':'insufficient_evidence',uncertain:uncertain.length,matched:matches.length,
-      model:'CREPE tiny · ONNX · on device'};
+      model:'CREPE tiny + YIN periodicity check'};
   }
 
   function historySummary(records,scoreKey,instrument){
     const attempts=records.filter(r=>r.scoreKey===scoreKey&&r.instrument===instrument).sort((a,b)=>a.date-b.date);
     const graded=attempts.filter(a=>Number.isFinite(a.grade));
     return {attempts,graded,best:graded.length?Math.max(...graded.map(r=>r.grade)):null,
-      minutes:attempts.reduce((s,a)=>s+a.duration,0)/60,improvement:graded.length>1?graded.at(-1).grade-graded[0].grade:null};
+      minutes:attempts.reduce((s,a)=>s+(a.practiceSeconds??a.duration),0)/60,improvement:graded.length>1?graded.at(-1).grade-graded[0].grade:null};
   }
   return {profiles,parseScore,Segmenter,align,assess,historySummary,pitchName,frequency,median,credit};
 });

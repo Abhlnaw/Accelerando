@@ -9,6 +9,7 @@ import streamlit.components.v1 as components
 
 from pipeline import Analysis, Request
 from replay import replay_html
+from ui.score_demo import show_demo
 
 
 _WARNINGS = {
@@ -73,6 +74,7 @@ def _findings(analysis: Analysis, original: bytes, view_key: str):
 def _score(analysis: Analysis, request: Request | None):
     st.subheader("Written score", anchor=False)
     if request:
+        show_demo(request.score_bytes)
         st.download_button("Download MusicXML", request.score_bytes, request.score_name,
                            mime="application/vnd.recordare.musicxml+xml", key="result_score")
     if not analysis.score:

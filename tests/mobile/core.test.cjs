@@ -101,3 +101,39 @@ test('quiet reliable notes reach the mobile grader',()=>{
  for(let i=0;i<16;i++)segmenter.push({time:i*.032,midi:50,confidence:.85,rms:.0004});
  segmenter.finish();assert.equal(segmenter.events.length,1);
 });
+
+test('voice can sing a consistent lower octave and instrument mode keeps concert pitch',()=>{
+ const s=score(),low=take(s).map(e=>({...e,midi:e.midi-12,confidence:.62}));
+ const result=C.assess(s,low,{voice:true});
+ assert.equal(result.grade,100);assert.equal(result.octaveShift,12);
+ assert.equal(C.assess(s,low).grade,null);
+});
+test('an identifiable prefix earns a separate excerpt score',()=>{
+ const s=score(),result=C.assess(s,take(s).slice(0,5));
+ assert.equal(result.grade,null);assert.equal(result.passage.grade,100);
+ assert.equal(result.passage.notes,5);
+ assert.equal(C.assess(s,[]).passage,null);
+});
+test('one wrong note in a recognizable four-note measure still gets a score',()=>{
+ const s={notes:score().notes.slice(0,4)},events=take(s);
+ events[2].midi++;
+ const result=C.assess(s,events);
+ assert.ok(result.grade>0&&result.grade<100);
+});
+test('live run uses the same weighted assessment while withholding a premature final grade',()=>{
+ const s=score(),events=take(s);
+ assert.equal(C.assess(s,events.slice(0,1),{partial:true}).provisionalGrade,null);
+ events[4].midi+=1;
+ const live=C.assess(s,events,{partial:true}),final=C.assess(s,events);
+ assert.equal(live.grade,null);
+ assert.equal(live.provisionalGrade,final.grade);
+ assert.ok(final.grade<100 && final.grade>0);
+ assert.ok(live.findings.some(f=>f.kind==='pitch'));
+});
+
+test('recognizable lower voice singing 85 cents flat receives pitch feedback',()=>{
+ const melody=score(),events=take(melody).map(event=>({...event,midi:event.midi-12.85}));
+ const report=C.assess(melody,events,{voice:true});
+ assert.ok(report.grade>0 && report.grade<100);
+ assert.ok(report.findings.some(f=>f.kind==='pitch'));
+});

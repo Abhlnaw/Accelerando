@@ -23,6 +23,21 @@ local microphone capture, neural pitch inference, live notation following and
 practice history. See its README for APK installation and Tab S7 FE testing.
 The Streamlit workflow below supports browser microphone recording and WAV uploads.
 
+To hear the notation before recording, upload MusicXML on **Practice** and open
+**Hear the written score**. Select a written line and either the whole piece or
+a measure. The same player is available on Examples and in the results score
+view. On the tablet, tap a measure or **Whole piece**, then **Hear selection**.
+Playback uses sounding pitches in equal temperament (A4 = 440 Hz), written
+durations and numeric tempo markings, with 80 quarter notes per minute as the
+starting tempo when the score supplies none.
+
+Open **Practice journal** in Streamlit or **Progress → Practice journal** on the
+tablet to log time, material practiced, personal notes, and recurring mistakes.
+Streamlit can attach the current assessment and charts daily minutes and average
+grades by piece. Its journal is stored in the local user's
+`.accelerando/journal.sqlite3`. The tablet keeps its journal in device history
+alongside recorded takes. Enter the full session duration when annotating a take.
+
 Open **Practice tools** in either app for a live chromatic tuner, tap-tempo
 metronome, and sustained reference drone. The tuner and drone share the concert
 A calibration. The metronome and drone can play together. Use **Stop all** or
@@ -35,6 +50,18 @@ melodies and comparison takes are labeled synthetic. A permitted recorded flute
 clip is included for real-performance inference checks. The separate development
 preview contains invented results and never feeds the upload pipeline.
 
+## Score run
+
+Choose a saved piece and written line, listen to its preview, then record a run.
+The playfield follows the performed notes with live pitch and timing judgments.
+The musical grade uses the expressive pitch, coverage and local rhythm weights.
+Arcade points scale that grade to 10,000 and advance with matched notes during
+the run. A combo counts consecutive clean matches. Finish to replay a finding
+and compare grades in the local history for that piece and line.
+
+Android consumes on-device CREPE frames and replays the saved native take.
+The browser uses microphone pitch detection and keeps the latest replay while
+the run is open. Both use the same note segmentation and assessment code.
 ## Start
 
 Use standard Windows CPython 3.12 (not the MSYS Python on PATH on this laptop):
