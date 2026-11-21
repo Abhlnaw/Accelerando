@@ -2,6 +2,7 @@ import streamlit as st
 
 from pipeline import Request
 from ui.design import intro
+from ui.score_demo import show_demo
 from ui.intake import analysis_action
 
 
@@ -58,6 +59,8 @@ def practice():
                 st.subheader("Matching MusicXML", anchor=False)
                 score = upload_field("Matching MusicXML", ["musicxml", "xml"], "practice_score",
                                      "MusicXML or XML · Parts, voices and chords supported · Up to 5 MiB")
+    if score:
+        show_demo(score[1])
     if audio or score:
         st.button("Clear files", on_click=clear_files)
     if audio:

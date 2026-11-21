@@ -22,7 +22,7 @@ function boot(persisted=new Map()){
  window.setTimeout=fn=>{fn();return 0;};window.console=console;
  const ctx=vm.createContext({document,DOMParser,Option:window.Option,localStorage:window.localStorage,Android:window.Android,Vex:window.Vex,console,setTimeout:window.setTimeout,addEventListener(){}});
  vm.runInContext('window=globalThis',ctx);
- for(const name of ['core.js','score-lines.js','storage.js','app.js']){try{vm.runInContext(fs.readFileSync(path.join(assets,name),'utf8'),ctx,{filename:name});}catch(error){throw new Error(name+': '+document.getElementById('notice').textContent,{cause:error});}}
+ for(const name of ['core.js','score-lines.js','score-demo.js','storage.js','app.js']){try{vm.runInContext(fs.readFileSync(path.join(assets,name),'utf8'),ctx,{filename:name});}catch(error){throw new Error(name+': '+document.getElementById('notice').textContent,{cause:error});}}
  return {window:ctx,document,calls,persisted,run:code=>vm.runInContext(code,ctx),click:id=>document.getElementById(id).click()};
 }
 const melody=`<score-partwise><work><work-title>My Tune</work-title></work><part id="P1"><measure number="1"><attributes><divisions>1</divisions></attributes>${['C','D','E','F','G','A'].map(s=>`<note><pitch><step>${s}</step><octave>5</octave></pitch><duration>1</duration></note>`).join('')}</measure></part></score-partwise>`;

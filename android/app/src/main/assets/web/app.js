@@ -25,6 +25,7 @@ function twinkle(instrument){
 }
 function notice(message){$('notice').hidden=!message;$('notice').textContent=message;}
 function setPage(page){
+  ScoreDemo.stop();
   if(!['home','practice','tools','library','progress'].includes(page))return;
   if(phase!=='idle'&&page!=='practice'){notice('Finish or cancel the current take before leaving practice.');return;}
   const host=$('tools-page'),frame=host.querySelector('iframe');
@@ -43,6 +44,7 @@ function setPage(page){
 function activeScore(){if(!selection)return score;return {...score,notes:score.notes.filter(n=>n.onset>=selection.onset&&n.onset<selection.end),measures:score.measures.filter(b=>b.onset>=selection.onset&&b.onset<selection.end)};}
 function key(){const source=JSON.stringify(score.notes.map(n=>[n.onset,n.duration,n.midi]));let hash=2166136261;for(const c of source)hash=Math.imul(hash^c.charCodeAt(0),16777619);return `${hash>>>0}:${partIndex}:${selection?selection.onset+':'+selection.end:'whole'}:${$('mode').value}:${$('mode').value==='guided'?$('target').value:''}`;}
 function changeScore(next){
+  ScoreDemo.stop();
   try{
     const candidates=ScoreLines.read(next,{profile:$('instrument').value,transpose:$('transpose').value});
     if(partIndex>=candidates.length)partIndex=0;const parsed=candidates[partIndex].score;scoreLines=candidates;reportLine='';
@@ -89,7 +91,7 @@ function renderScore(){
         const svg=row.querySelector('svg');const zone=document.createElementNS('http://www.w3.org/2000/svg','rect');
         for(const [k,v] of Object.entries({x:x+3,y:0,width:barWidth-7,height:154,fill:'transparent'}))zone.setAttribute(k,v);
         zone.style.cursor='pointer';zone.setAttribute('role','button');zone.setAttribute('tabindex','0');zone.setAttribute('aria-label',`Practice measure ${bar.label}`);
-        const select=()=>{if(phase!=='idle')return;resetReport();const index=score.measures.indexOf(bar);selection={onset:bar.onset,end:score.measures[index+1]?.onset||score.duration,label:bar.label};$('follow-label').textContent=`Practicing measure ${bar.label}`;$('score-subtitle').textContent='Tap Whole piece to return to the full melody';notice(`Selected measure ${bar.label}. Start practice when ready.`);};
+        const select=()=>{if(phase!=='idle')return;ScoreDemo.stop();resetReport();const index=score.measures.indexOf(bar);selection={onset:bar.onset,end:score.measures[index+1]?.onset||score.duration,label:bar.label};$('follow-label').textContent=`Practicing measure ${bar.label}`;$('score-subtitle').textContent='Tap Whole piece to return to the full melody';notice(`Selected measure ${bar.label}. Start practice when ready.`);};
         zone.addEventListener('click',select);zone.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')select();});svg.append(zone);
       }
     }
@@ -103,12 +105,13 @@ function markNotes(result){
   }
 }
 function setPhase(next){phase=next;const busy=next!=='idle';$('start').hidden=busy;$('stop').hidden=!busy;$('stop').disabled=next==='importing';$('stop').textContent=next==='loading'?'Cancel':next==='importing'?'Reading file…':'Finish take';
-  ['instrument','mode','target','transpose','change-piece','audio-upload','score-upload','part','twinkle','whole-piece','reference-upload','home-import','home-continue','home-open-score'].forEach(id=>$(id).disabled=busy);
+  ['instrument','mode','target','transpose','change-piece','audio-upload','score-upload','part','twinkle','whole-piece','hear-score','reference-upload','home-import','home-continue','home-open-score'].forEach(id=>$(id).disabled=busy);
   document.querySelectorAll('.nav').forEach(button=>button.disabled=busy);
   if(!busy){$('start').disabled=!scoreReady;$('audio-upload').disabled=!scoreReady;}
   $('listening-orb').classList.toggle('listening',next==='recording');
 }
 function begin(imported=false){
+  ScoreDemo.stop();
   if(!window.Android){notice('Install the Android APK for microphone recording and on-device analysis. This browser view previews the interface.');return;}
   if(phase!=='idle')return;
   if(!scoreReady){notice('Choose a supported score before starting.');return;}
@@ -315,7 +318,17 @@ updateTempoControl();
 $('instrument').onchange=()=>{if(changeScore(builtin?twinkle($('instrument').value):xml))persistSettings();else $('instrument').value=score.profile;};
 $('transpose').onchange=()=>{if(changeScore(xml))persistSettings();};
 $('part').onchange=()=>{const previous=partIndex;automaticLine=$('part').value==='auto';partIndex=automaticLine?0:Number($('part').value);if(changeScore(xml))persistSettings();else{partIndex=previous;$('part').value=String(previous);}};
-$('change-piece').onclick=()=>setPage('library');$('whole-piece').onclick=()=>{selection=null;resetReport();$('follow-label').textContent='Your score';$('score-subtitle').textContent='Choose a measure to practice from there';notice('Whole piece selected.');};
+$('hear-score').onclick=async()=>{
+  const button=$('hear-score');
+  if(button.dataset.playing==='yes'){ScoreDemo.stop();return;}
+  if(phase!=='idle'||!scoreReady)return;
+  window.Android?.stopPlayback?.();
+  const reset=()=>{button.dataset.playing='no';button.textContent='Hear selection';};
+  button.dataset.playing='yes';button.textContent='Stop demonstration';
+  try{await ScoreDemo.play(score,selection,reset);}
+  catch(error){reset();notice('Score playback failed: '+error.message);}
+};
+$('change-piece').onclick=()=>setPage('library');$('whole-piece').onclick=()=>{ScoreDemo.stop();selection=null;resetReport();$('follow-label').textContent='Your score';$('score-subtitle').textContent='Choose a measure to practice from there';notice('Whole piece selected.');};
 $('twinkle').onclick=()=>openPiece('twinkle');
 $('start').onclick=()=>begin();$('stop').onclick=()=>{if(window.Android){$('stop').disabled=true;Android.stop();}};
 $('audio-upload').onclick=()=>begin(true);$('score-upload').onclick=()=>window.Android?Android.importFile('score'):notice('Open the Android APK to import scores from your tablet.');

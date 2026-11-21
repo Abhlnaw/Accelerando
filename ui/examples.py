@@ -5,6 +5,7 @@ import pipeline
 from pipeline import Request
 from ui.design import intro
 from ui.intake import analysis_action
+from ui.score_demo import show_demo
 
 
 def excerpt_label(piece: dict) -> str:
@@ -64,6 +65,7 @@ def examples():
             st.caption(recording.get("source", piece.get("source", "Source unavailable")))
             st.download_button("Download MusicXML", request.score_bytes, request.score_name,
                                mime="application/vnd.recordare.musicxml+xml")
+        show_demo(request.score_bytes)
         analysis_action("examples", f"{title} · {recording['label']}", request)
     except (InputError, OSError, KeyError) as exc:
         st.error(f"Cannot open this example. {exc}")

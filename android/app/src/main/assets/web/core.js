@@ -24,7 +24,7 @@
   const credit = (error,full,zero) => Math.max(0, Math.min(100,100*(zero-Math.abs(error))/(zero-full)));
   const pitchName = midi => ['C','C♯','D','E♭','E','F','F♯','G','A♭','A','B♭','B'][((Math.round(midi)%12)+12)%12]+(Math.floor(Math.round(midi)/12)-1);
   const frequency = midi => 440*2**((midi-69)/12);
-  function parseScore(xml, {profile='guitar', transpose='score', partIndex=0, projectedChordLine=false,
+  function parseScore(xml, {profile='guitar', transpose='score', partIndex=0, projectedChordLine=false, playbackOnly=false,
                             DOMParser:Parser=globalThis.DOMParser}={}) {
     if(!profiles[profile])throw Error('Choose a supported instrument profile.');
     if (!xml || xml.length>5*1024*1024) throw Error('Choose a MusicXML file smaller than 5 MB.');
@@ -65,7 +65,7 @@
         if(!['note','forward'].includes(item.localName))continue;
         const duration=number(item,'duration',0)/divisions;
         if(duration<=0)throw Error('Each note and rest needs a positive duration.');
-        if(![.125,.25,.375,.5,.75,1,1.5,2,3,4].includes(duration))throw Error('This notation duration is unsupported. Export a melodic excerpt with standard note lengths.');
+        if(!playbackOnly && ![.125,.25,.375,.5,.75,1,1.5,2,3,4].includes(duration))throw Error('This notation duration is unsupported. Export a melodic excerpt with standard note lengths.');
         const rest=item.localName==='forward'||!!child(item,'rest');
         if(rest){if(pending && !projectedChordLine)throw Error('A tie cannot continue through a rest.');pending=null;bar.events.push({rest:true,onset:cursor,duration});cursor+=duration;continue;}
         const p=child(item,'pitch');if(!p)throw Error('Unpitched percussion is not supported by this pitch model.');

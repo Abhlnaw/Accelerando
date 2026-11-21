@@ -8,6 +8,14 @@ local microphone capture, neural pitch inference, live notation following and
 practice history. See its README for APK installation and Tab S7 FE testing.
 The Streamlit workflow below supports browser microphone recording and WAV uploads.
 
+To hear the notation before recording, upload MusicXML on **Practice** and open
+**Hear the written score**. Select a written line and either the whole piece or
+a measure. The same player is available on Examples and in the results score
+view. On the tablet, tap a measure or **Whole piece**, then **Hear selection**.
+Playback uses sounding pitches in equal temperament (A4 = 440 Hz), written
+durations and numeric tempo markings, with 80 quarter notes per minute as the
+starting tempo when the score supplies none.
+
 Open **Practice journal** in Streamlit or **Progress → Practice journal** on the
 tablet to log time, material practiced, personal notes, and recurring mistakes.
 Streamlit can attach the current assessment and charts daily minutes and average
