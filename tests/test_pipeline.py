@@ -14,6 +14,7 @@ import wave
 from contracts import InputError, ObservedNote, Result, ScoreNote, Take
 import pipeline as p
 from replay import replay_html
+from score.lines import ScoreLine
 
 
 def wav_bytes(seconds=1, value=100):
@@ -35,7 +36,7 @@ class PipelineTests(unittest.TestCase):
         def parse(path):
             self.paths.append(path)
             self.assertEqual(path.read_bytes(), self.request.score_bytes)
-            return self.score
+            return [ScoreLine("Test part", self.score)]
         def extract(path):
             self.paths.append(path)
             self.assertTrue(path.exists())
@@ -45,7 +46,7 @@ class PipelineTests(unittest.TestCase):
         self.grader = lambda score, take, references: Result("ok", 100)
 
     def run_request(self, references=()):
-        modules = {"score": types.SimpleNamespace(parse_score=self.parser),
+        modules = {"score": types.SimpleNamespace(read_lines=self.parser),
                    "audio": types.SimpleNamespace(extract=self.extractor),
                    "grading": types.SimpleNamespace(analyze=self.grader)}
         with patch.object(p, "import_module", side_effect=modules.__getitem__), \

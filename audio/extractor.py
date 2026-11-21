@@ -11,6 +11,7 @@ import soundfile as sf
 from contracts import InputError, Take
 
 from ._notes import segment_notes
+from ._acoustics import describe_notes, reinforce_periodic_frames
 from ._tracking import CrepeUnavailable, crepe_frames, pyin_frames
 
 
@@ -52,12 +53,19 @@ def extract(path: str | Path, *, denoise: bool = True) -> Take:
         divisor = gcd(sample_rate, _RATE)
         mono = signal.resample_poly(mono, _RATE // divisor, sample_rate // divisor)
 
+    # Remove DC and subsonic handling noise before estimating room level.
+    if denoise:
+        mono = signal.sosfilt(signal.butter(2, 22, "highpass", fs=_RATE, output="sos"),
+                              mono).astype(np.float32)
     energy = _frame_rms(mono, _RATE)
     noise_rms = _noise_floor(energy)
     analysis = _attenuate_noise(mono, energy, noise_rms) if denoise and noise_rms else mono
+    audibility = max(_SILENCE_RMS, noise_rms * 1.65)
 
     try:
         frequency, confidence = crepe_frames(analysis, _RATE, _HOP)
+        confidence = reinforce_periodic_frames(analysis, _RATE, _HOP, frequency, confidence,
+                                               energy >= audibility)
         method = f"CREPE tiny (torchcrepe {version('torchcrepe')})"
     except CrepeUnavailable:
         frequency, confidence = pyin_frames(analysis, _RATE, _HOP)
@@ -67,12 +75,12 @@ def extract(path: str | Path, *, denoise: bool = True) -> Take:
     clip_rms = _frame_rms(clipping, sample_rate) if clipping.any() else None
     events, uncertain = segment_notes(
         frequency, confidence, energy, clip_rms,
-        audibility=max(_SILENCE_RMS, noise_rms * 1.65),
+        audibility=audibility,
         hop_s=_HOP / _RATE, duration=duration,
     )
     if not events or any(region.reason == "LOW_CONFIDENCE" for region in uncertain):
         warnings.append("LOW_SIGNAL")
-    return Take(method, events, warnings, duration, uncertain)
+    return Take(method, events, warnings, duration, uncertain, describe_notes(mono, _RATE, events))
 
 
 def _read_wav(path: Path) -> tuple[np.ndarray, int, str]:

@@ -20,6 +20,21 @@ def open_app(page: str | None = None, timeout: int = 30):
 
 
 class AppTests(unittest.TestCase):
+    def test_finishing_microphone_take_runs_assessment_with_selected_score(self):
+        score = SimpleNamespace(name="score.xml", getvalue=lambda: b"score")
+        recording = SimpleNamespace(name="recording.wav", getvalue=lambda: b"mic samples")
+        analysis = Analysis(Result("ok", 91), Take("test"), [], {})
+        with patch("streamlit.file_uploader", side_effect=lambda label, **kwargs:
+                   score if label == "Matching MusicXML" else None), \
+             patch("streamlit.audio_input", return_value=recording), \
+             patch("pipeline.run_analysis", return_value=analysis) as run:
+            app = open_app("practice")
+            app.radio[0].set_value("Microphone").run()
+            self.assertFalse(app.exception)
+            run.assert_called_once()
+            self.assertEqual(run.call_args.args[0].audio_bytes, b"mic samples")
+            self.assertEqual(app.session_state["completed_analysis"].analysis.result.grade, 91)
+
     def test_studio_and_empty_results(self):
         app = open_app()
         self.assertFalse(app.exception)

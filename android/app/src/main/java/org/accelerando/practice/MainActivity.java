@@ -120,7 +120,9 @@ public final class MainActivity extends Activity {
                     JSONObject p=new JSONObject();try{p.put("time",time);p.put("midi",midi);p.put("confidence",confidence);p.put("rms",rms);p.put("inferenceMs",ms);p.put("clipped",clipped);}catch(JSONException ignored){}event("frame",p);
                 };
                 if(imported==null)instance.record(listener);else instance.analyzeWav(imported,listener);
-                recording=new File(getFilesDir(),"last-take.wav");instance.writeWav(recording);
+                recording=new File(getFilesDir(),"last-take.wav");
+                if (imported == null) instance.writeWav(recording);
+                else try (FileOutputStream out = new FileOutputStream(recording)) { out.write(imported); }
                 message("stopped","Take saved on this tablet");
             }catch(Exception ex){message("error",ex.getMessage()==null?"Audio analysis failed. Please retry.":ex.getMessage());}
             finally{engine=null;busy=false;runOnUiThread(()->getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON));}

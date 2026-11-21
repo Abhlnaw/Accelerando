@@ -26,7 +26,7 @@ def upload_field(label: str, formats: list[str], storage_key: str, hint: str):
 
 
 def clear_files():
-    for key in ("practice_wav", "practice_score"):
+    for key in ("practice_wav", "practice_score", "practice_mic", "last_mic_submission"):
         st.session_state.pop(key, None)
     st.session_state.upload_generation = st.session_state.get("upload_generation", 0) + 1
 
@@ -38,12 +38,26 @@ def practice():
         with audio_column:
             with st.container(border=True, key="audio_upload"):
                 st.subheader("Your performance", anchor=False)
-                audio = upload_field("Your performance", ["wav"], "practice_wav", "PCM WAV · Up to 45 seconds and 25 MiB")
+                st.session_state.setdefault("practice_audio_source",
+                                            st.session_state.get("saved_audio_source", "Upload"))
+                source = st.radio("Audio source", ["Upload", "Microphone"], horizontal=True,
+                                  key="practice_audio_source")
+                st.session_state.saved_audio_source = source
+                if source == "Microphone":
+                    mic_key = f"microphone_{st.session_state.get('upload_generation', 0)}"
+                    recording = st.audio_input("Record a take", sample_rate=16000, key=mic_key,
+                                               on_change=remember_upload, args=(mic_key, "practice_mic"))
+                    if recording:
+                        st.session_state.practice_mic = ("recording.wav", recording.getvalue())
+                    audio = st.session_state.get("practice_mic")
+                    st.caption("With a score selected, finishing your recording starts the assessment.")
+                else:
+                    audio = upload_field("Your performance", ["wav"], "practice_wav", "PCM WAV · Up to 45 seconds and 25 MiB")
         with score_column:
             with st.container(border=True, key="score_upload"):
                 st.subheader("Matching MusicXML", anchor=False)
                 score = upload_field("Matching MusicXML", ["musicxml", "xml"], "practice_score",
-                                     "MusicXML or XML · Single melodic part in concert pitch · Up to 5 MiB")
+                                     "MusicXML or XML · Parts, voices and chords supported · Up to 5 MiB")
     if audio or score:
         st.button("Clear files", on_click=clear_files)
     if audio:
@@ -53,8 +67,9 @@ def practice():
             st.audio(audio[1], format="audio/wav")
     request = Request(audio[1], score[1], audio[0], score[0]) if audio and score else None
     if request is None:
-        st.caption("Add both files to enable analysis.")
-    analysis_action("practice", audio[0] if audio else "Your performance", request)
+        st.caption("Select a score and record or upload your take.")
+    analysis_action("practice", audio[0] if audio else "Your performance", request,
+                    on_recording=source == "Microphone")
 
 
 practice()

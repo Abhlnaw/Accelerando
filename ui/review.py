@@ -34,7 +34,11 @@ def _findings(analysis: Analysis, original: bytes, view_key: str):
     result = analysis.result
     findings = result.findings[:3]
     st.subheader("What to practice next", anchor=False)
-    if result.status == "insufficient_evidence":
+    if analysis.score_line:
+        st.caption(f"Assessed line · {analysis.score_line}")
+    if "AMBIGUOUS_SCORE_LINE" in result.warnings:
+        st.info("Several written lines fit this take similarly. Include a phrase where their pitches differ.")
+    elif result.status == "insufficient_evidence":
         st.info("Too little reliable evidence to grade this take. Record the full melody closer to the microphone in a quiet room.")
     elif not findings:
         st.success("No specific correction came up. Listen back for a steady, intentional line.")
@@ -121,6 +125,7 @@ def _diagnostics(analysis: Analysis):
             "method": analysis.take.method,
             "runtime_seconds": analysis.timings_s,
             "observed_notes": [asdict(note) for note in analysis.take.events],
+            "acoustic_measurements": analysis.take.acoustic_measurements,
             "uncertain_regions": [asdict(region) for region in analysis.take.uncertain_regions],
             "written_notes": [asdict(note) for note in analysis.score],
         })

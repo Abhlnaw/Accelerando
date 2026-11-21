@@ -78,21 +78,25 @@ def _ties(note: ET.Element) -> set[str]:
     return ties & {"start", "stop"}
 
 
-def _part(root: ET.Element) -> ET.Element:
+def _validate_navigation(root: ET.Element):
     if root.tag != "score-partwise":
         raise ScoreInputError("Export a partwise MusicXML score.")
-    parts = root.findall("part")
-    if len(parts) != 1:
-        raise ScoreInputError("Export one melodic part.")
     types = {element.tag for element in root.iter()}
     if types & {"repeat", "ending", "beat-repeat", "measure-repeat"} or any(
         _NAVIGATION_ATTRIBUTES.intersection(sound.attrib) for sound in root.iter("sound")
     ):
         raise ScoreInputError("Expand repeat signs, alternate endings and jumps before export.")
-    if types & {"chord", "backup"}:
-        raise ScoreInputError("Export one melodic voice without chords or overlapping parts.")
     if types & ({"grace", "cue"} | _UNSUPPORTED_MARKINGS):
         raise ScoreInputError("Write out grace notes and ornaments and remove cue notes before export.")
+
+
+def _part(root: ET.Element) -> ET.Element:
+    _validate_navigation(root)
+    parts = root.findall("part")
+    if len(parts) != 1:
+        raise ScoreInputError("Export one melodic part.")
+    if root.find(".//chord") is not None or root.find(".//backup") is not None:
+        raise ScoreInputError("Export one melodic voice without chords or overlapping parts.")
     for transpose in root.iter("transpose"):
         if transpose.find("double") is not None or any(
             _number(transpose.findtext(field, "0"), field) != 0
@@ -170,14 +174,19 @@ def _read_attacks(part: ET.Element) -> list[_Attack]:
     return attacks
 
 
-def parse_score(path: str | Path) -> list[ScoreNote]:
-    """Return attacks in order, with written measure labels and quarter-note positions."""
+def _read_root(path):
     try:
         root = ET.parse(path).getroot()
     except (ET.ParseError, OSError, LookupError) as exc:
         raise ScoreInputError("Choose a readable, uncompressed MusicXML file.") from exc
     for element in root.iter():
         element.tag = element.tag.rsplit("}", 1)[-1]
+    return root
+
+
+def parse_score(path: str | Path) -> list[ScoreNote]:
+    """Strict single-line importer for callers that already know their part."""
+    root = _read_root(path)
     attacks = _read_attacks(_part(root))
 
     return [
