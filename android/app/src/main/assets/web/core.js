@@ -176,9 +176,11 @@
     const sufficient=anchors.length>=Math.min(4,score.notes.length)&&anchors.length>=score.notes.length/2&&fraction>=.75;
     const components=mode==='guided'?[[pitch,.45],[coverage,.25],[rhythm,.20],[tempo,.10]]:[[pitch,.50],[coverage,.30],[rhythm,.20]];
     const available=components.filter(([v])=>v!==null);
-    const grade=!partial&&sufficient?available.reduce((s,[v,w])=>s+v*w,0)/available.reduce((s,[,w])=>s+w,0):null;
+    const weighted=available.length?available.reduce((s,[v,w])=>s+v*w,0)/available.reduce((s,[,w])=>s+w,0):null;
+    const grade=!partial&&sufficient?weighted:null;
+    const provisionalGrade=anchors.length>=2?weighted:null;
     const current=matches.at(-1)?.note.id||score.notes[0]?.id;
-    return {grade,pitch,coverage,rhythm,tempo:mode==='guided'?tempo:null,bpm,fraction,colors,current,path,findings:findings.slice(0,12),
+    return {grade,provisionalGrade,pitch,coverage,rhythm,tempo:mode==='guided'?tempo:null,bpm,fraction,colors,current,path,findings:findings.slice(0,12),
       status:sufficient?'ok':'insufficient_evidence',uncertain:uncertain.length,matched:matches.length,
       model:'CREPE tiny · ONNX · on device'};
   }

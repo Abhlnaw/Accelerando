@@ -190,6 +190,7 @@ public final class MainActivity extends Activity {
     @Override protected void onStop(){
         super.onStop();
         web.evaluateJavascript("document.querySelector('#tools-page iframe')?.contentWindow.stopPracticeTools?.()",null);
+        web.evaluateJavascript("document.querySelector('#game-page iframe')?.contentWindow.stopGame?.()",null);
     }
     @Override protected void onDestroy(){destroyed=true;if(engine!=null)engine.stop();worker.shutdown();web.destroy();super.onDestroy();}
     static byte[] readLimited(InputStream in,int limit)throws IOException{
