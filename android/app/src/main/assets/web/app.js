@@ -45,7 +45,8 @@ function setPage(page){
     if (active) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
-  $('page-heading').textContent={home:'Welcome to your studio.',game:'Score run',practice:'Practice studio',tools:'Practice tools',library:'Music library',progress:'Your progress'}[page];
+  $('page-heading').textContent={home:'Your practice studio',game:'Score run',practice:'Practice studio',tools:'Practice tools',library:'Music library',progress:'Your progress'}[page];
+  document.body.dataset.page=page;
   if(page==='home')renderHome();if(page==='practice')setTimeout(renderScore,30);if(page==='progress')renderProgress();if(page==='library')renderLibrary();
 }
 let rangeStart=null, lastVoiced=null, finishRequested=false, liveMic=false;
@@ -60,16 +61,36 @@ function changeScore(next){
     $('piece-title').textContent=score.title;$('piece-meta').textContent=`${score.measures.length} measures · ${Coach.profiles[score.profile].name} · Single melodic line`;
     $('part-control').hidden=candidates.length<2;$('part').replaceChildren(new Option('Match my recording','auto'),...candidates.map((line,i)=>new Option(line.label,i)));$('part').value=automaticLine?'auto':String(partIndex);
     $('follow-label').textContent='Your score';$('score-subtitle').textContent='Tap the first and last measures to practice a range';notice('');renderScore();
-    $('coach-title').textContent='Find your first note.';$('coach-copy').textContent=`Your first sounding note is ${Coach.pitchName(score.notes[0].midi)}. Tap Start practice, allow the microphone, and play at your own pace.`;
-    if(automaticLine&&candidates.length>1){$('piece-meta').textContent=`${score.measures.length} measures · ${candidates.length} written lines`;$('follow-label').textContent='Score preview';$('coach-title').textContent='Play your line';$('coach-copy').textContent='Finish a take to identify your written line, or select it in the library for live following.';}
+    promptForPassage();
+    if(automaticLine&&candidates.length>1){$('piece-meta').textContent=`${score.measures.length} measures · ${candidates.length} written lines`;$('follow-label').textContent='Score preview';}
     return true;
   }catch(error){notice(error.message);return false;}
 }
 function durationToken(duration){const table={4:'w',2:'h',1:'q',.5:'8',.25:'16',.125:'32',3:'h',1.5:'q',.75:'8',.375:'16'};const token=table[duration];if(!token)throw Error('This notation duration is not supported. Export a simpler melodic excerpt.');return {token,dotted:[3,1.5,.75,.375].includes(duration)};}
+function promptForPassage(){
+  if(automaticLine && scoreLines.length>1){
+    $('coach-title').textContent='Play your line';
+    $('coach-copy').textContent='Play one melody. Your take will be matched to the written lines.';
+    return;
+  }
+  const first=activeScore().notes[0];
+  $('coach-title').textContent=first?'Start on '+Coach.pitchName(first.midi):'This passage is a rest';
+  $('coach-copy').textContent=first?'Hear the selection, then record your take.':'Select a measure with a sounding note to practice.';
+}
+function showSelection(){
+  for(const zone of document.querySelectorAll('#score rect[data-onset]')){
+    const onset=Number(zone.dataset.onset);
+    zone.setAttribute('aria-pressed',String(Boolean(selection && onset>=selection.onset && onset<selection.end)));
+  }
+  $('follow-label').textContent=selection?'Practice measure '+selection.label:
+    automaticLine && scoreLines.length>1?'Score preview':'Your score';
+  $('score-subtitle').textContent=rangeStart!==null?'Tap the last measure to extend this passage':
+    'Tap a measure to select it, then another to extend the passage';
+}
 function renderScore(){
   if(!score||$('practice-page').hidden)return;
   const host=$('score');host.replaceChildren();nodeMap.clear();
-  const VF=Vex.Flow, width=Math.max(280,host.clientWidth-20), perRow=width>650?2:1,barWidth=width/perRow,tieNotes=new Map();
+  const VF=Vex.Flow, width=Math.max(280,host.clientWidth-20), perRow=width>600?2:1,barWidth=width/perRow,tieNotes=new Map();
   try{
     for(let start=0;start<score.measures.length;start+=perRow){
       const row=document.createElement('div');row.className='score-row';host.append(row);
@@ -98,15 +119,15 @@ function renderScore(){
         });
         const svg=row.querySelector('svg');const zone=document.createElementNS('http://www.w3.org/2000/svg','rect');
         for(const [k,v] of Object.entries({x:x+3,y:0,width:barWidth-7,height:154,fill:'transparent'}))zone.setAttribute(k,v);
-        zone.style.cursor='pointer';zone.setAttribute('role','button');zone.setAttribute('tabindex','0');zone.setAttribute('aria-label',`Practice measure ${bar.label}`);
+        zone.dataset.onset=String(bar.onset);zone.style.cursor='pointer';zone.setAttribute('role','button');zone.setAttribute('tabindex','0');zone.setAttribute('aria-label',`Practice measure ${bar.label}`);
         const select=()=>{if(phase!=='idle')return;ScoreDemo.stop();resetReport();const index=score.measures.indexOf(bar);const first=Math.min(rangeStart??index,index),last=Math.max(rangeStart??index,index);
           const startBar=score.measures[first],endBar=score.measures[last];
           rangeStart=rangeStart===null?index:null;
-          selection={onset:startBar.onset,end:score.measures[last+1]?.onset||score.duration,label:first===last?bar.label:startBar.label+'–'+endBar.label};$('follow-label').textContent=`Practice ${selection.label}`;$('score-subtitle').textContent=rangeStart===null?'Tap a measure to start a new range':'Tap the last measure to extend this passage';notice(`Selected ${selection.label}. Start practice when ready.`);};
-        zone.addEventListener('click',select);zone.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')select();});svg.append(zone);
+          selection={onset:startBar.onset,end:score.measures[last+1]?.onset||score.duration,label:first===last?bar.label:startBar.label+'–'+endBar.label};showSelection();promptForPassage();notice('');};
+        zone.addEventListener('click',select);zone.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select();}});svg.append(zone);
       }
     }
-    scoreReady=true;$('start').disabled=false;$('audio-upload').disabled=false;markNotes(lastAnalysis);
+    scoreReady=true;$('start').disabled=phase!=='idle';$('audio-upload').disabled=phase!=='idle';showSelection();markNotes(lastAnalysis);
   }catch(error){scoreReady=false;$('start').disabled=true;$('audio-upload').disabled=true;notice(`Could not draw this score: ${error.message}`);}
 }
 function markNotes(result){
@@ -116,10 +137,21 @@ function markNotes(result){
   }
 }
 function setPhase(next){phase=next;const busy=next!=='idle';$('start').hidden=busy;$('stop').hidden=!busy;$('stop').disabled=next==='importing';$('stop').textContent=next==='loading'?'Cancel':next==='importing'?'Reading file…':'Finish take';
-  ['instrument','mode','target','transpose','change-piece','audio-upload','score-upload','part','twinkle','whole-piece','hear-score','reference-upload','home-import','home-continue','home-open-score'].forEach(id=>$(id).disabled=busy);
+  ['instrument','mode','target','transpose','change-piece','audio-upload','score-upload','part','twinkle','whole-piece','hear-score','reference-upload','home-import','home-continue'].forEach(id=>$(id).disabled=busy);
   document.querySelectorAll('.nav').forEach(button=>button.disabled=busy);
   if(!busy){$('start').disabled=!scoreReady;$('audio-upload').disabled=!scoreReady;}
   $('listening-orb').classList.toggle('listening',next==='recording');
+}
+function endInterruptedTake(message){
+  session=null;segmenter=null;activeSessionId=null;
+  resetReport();setPhase('idle');showSelection();
+  $('audio-level').style.width='0%';
+  $('heard-note').textContent='—';$('heard-hz').textContent='Waiting for sound';
+  $('heard-confidence').textContent='CREPE tiny · neural pitch tracker';
+  $('audio-status').textContent='Ready for another take.';$('elapsed').textContent='0:00';
+  $('latency').textContent='Local processing';
+  $('coach-title').textContent='Ready to retry';$('coach-copy').textContent=message;
+  notice(message);
 }
 function begin(imported=false){
   ScoreDemo.stop();
@@ -148,7 +180,7 @@ window.nativeEvent=(type,data)=>{
     activeSessionId=data.sessionId??null;setPhase('loading');notice(data.message);return;
   }
   if(data.sessionId!==undefined&&activeSessionId!==null&&data.sessionId!==activeSessionId)return;
-  if(type==='cancelled'){session=null;segmenter=null;activeSessionId=null;setPhase('idle');notice(data.message||'Take cancelled. Nothing was saved.');return;}
+  if(type==='cancelled'){endInterruptedTake(data.message||'Take cancelled. Nothing was saved.');return;}
   if(type==='playback'){notice(data.message);return;}
   if(type==='started'){liveMic=data.message==='Listening through the tablet microphone';lastVoiced=null;finishRequested=false;segmenter=new Coach.Segmenter();inference=[];clipped=false;lastAnalysis=null;lastFrame=0;lastRender=-Infinity;$('report').hidden=true;setPhase('recording');notice('');$('coach-title').textContent='I’m listening.';$('coach-copy').textContent='Play your passage. Pause at the end to finish automatically.';return;}
   if(type==='frame'){
@@ -208,15 +240,20 @@ window.nativeEvent=(type,data)=>{
     const r=lastAnalysis;const {path,...savedResult}=r;
     const record={date:Date.now(),...session,title:score.title,passage:session.selection?.label||'Whole piece',duration:data.duration??lastFrame,recordingId,grade:r.grade,pitch:r.pitch,coverage:r.coverage,rhythm:r.rhythm,bpm:r.bpm,fraction:r.fraction,findings:r.findings,model:r.model,result:savedResult};delete record.score;delete record.clock;
     try{store.addRecord(record);recordStore=store.records();notice('Practice saved on this tablet. Read your next action below.');}catch(error){notice(error.message+' The current report is still available.');}
-    session=null;segmenter=null;activeSessionId=null;$('coach-title').textContent='One take closer.';$('coach-copy').textContent=r.findings[0]?.message||'Finish with one deliberate replay of the phrase.';return;
+    session=null;segmenter=null;activeSessionId=null;$('report').scrollIntoView?.({block:'start'});$('coach-title').textContent='Take complete';$('coach-copy').textContent=r.findings[0]?.message||'Finish with one deliberate replay of the phrase.';return;
   }
   if(type==='score'){setPhase('idle');importScore(data.xml);return;}
-  if(type==='error'){if(data.scope==='audio'||!data.scope||phase==='importing'){session=null;segmenter=null;activeSessionId=null;setPhase('idle');}notice(data.message);return;}
+  if(type==='error'){
+    if(session && (data.scope==='audio'||!data.scope))endInterruptedTake(data.message);
+    else{if(phase==='importing')setPhase('idle');notice(data.message);}
+    return;
+  }
   if(type==='reference')notice(data.message);
 };
 function metric(label,value,highlight=false){const el=document.createElement('div');el.className='metric'+(highlight?' highlight':'');const small=document.createElement('small');small.textContent=label;const strong=document.createElement('strong');strong.textContent=value;el.append(small,strong);return el;}
 const display=value=>value===null||!Number.isFinite(value)?'—':Math.round(value);
 function showReport(result){
+  const audioAvailable=Boolean(recordingId && (!window.Android?.hasRecording || Android.hasRecording(recordingId)));
   $('report').hidden=false;$('report-metrics').replaceChildren(metric(result.passage?'Excerpt':'Overall',result.grade===null?(result.passage?display(result.passage.grade)+'/100':'Ungraded'):display(result.grade)+'/100',true),metric('Pitch',display(result.pitch)),metric('Note coverage',display(result.coverage)),metric('Local rhythm',display(result.rhythm)));
   const tempo=result.bpm?`Measured tempo ${Math.round(result.bpm)} BPM.`:'Too few timing anchors to estimate tempo.';
   $('report-context').textContent=`${Math.round(result.fraction*100)}% of written attacks assessed. ${tempo} ${result.grade===null?'The take needs more reliable matching notes before an overall grade is appropriate.':''} ${result.clipped?'Clipping was detected; retry with more distance from the microphone.':''}`;
@@ -229,23 +266,23 @@ function showReport(result){
   $('findings').replaceChildren();
   $('report-context').textContent += ' '+(result.reportLine||'');
   for(const finding of result.findings.slice(0,3)){
-    const item=document.createElement('div');item.className='finding '+finding.kind;const text=document.createElement('div'),title=document.createElement('strong'),copy=document.createElement('p'),button=document.createElement('button');title.textContent=`Measure ${finding.measure} · ${finding.kind}`;copy.textContent=finding.message+(finding.approximate?' Replay time is an approximate neighboring anchor.':'');button.textContent='Replay passage';button.className='secondary';button.disabled=!recordingId;button.onclick=()=>replay(Math.max(0,finding.time-.3));text.append(title,copy);item.append(text,button);$('findings').append(item);
+    const item=document.createElement('div');item.className='finding '+finding.kind;const text=document.createElement('div'),title=document.createElement('strong'),copy=document.createElement('p'),button=document.createElement('button');title.textContent=`Measure ${finding.measure} · ${finding.kind}`;copy.textContent=finding.message+(finding.approximate?' Replay time is an approximate neighboring anchor.':'');button.textContent='Replay passage';button.className='secondary';button.disabled=!audioAvailable || !Number.isFinite(finding.time);button.onclick=()=>replay(Math.max(0,finding.time-.3));text.append(title,copy);item.append(text,button);$('findings').append(item);
   }
   if(!result.findings.length){const p=document.createElement('p');p.className='intro';p.textContent=result.grade===null?'No confident corrections to show. Try the whole passage in a quieter room.':'No specific correction stood out. Play the phrase again with the sound you want.';$('findings').append(p);}
-  $('replay-full').disabled=!recordingId||!!(window.Android?.hasRecording&&!Android.hasRecording(recordingId));
+  $('replay-full').disabled=!audioAvailable;
   $('technical').textContent=`${result.model}. Median frame inference ${Math.round(result.inferenceMs||0)} ms on this device. ${result.uncertain||0} uncertain frames. Live note markings may change when later notes clarify the alignment. Target-tempo score: ${display(result.tempo)}. Frequency is measured in Hz and converted to cents relative to the written sounding pitch.`;
 }
 function renderProgress(){
   const summary=Coach.historySummary(recordStore,key(),$('instrument').value);
   $('progress-context').textContent=`${score.title} · ${Coach.profiles[$('instrument').value].name} · ${selection?'Measure '+selection.label:'Whole piece'} · ${$('mode').value==='guided'?'Target tempo':$('mode').value==='written'?'Written tempo':'Expressive practice'}`;
-  $('progress-metrics').replaceChildren(metric('Attempts',summary.attempts.length,true),metric('Best score',display(summary.best)),metric('Practice minutes',summary.minutes.toFixed(1)),metric('Since first take',summary.improvement===null?'—':`${summary.improvement>=0?'+':''}${Math.round(summary.improvement)} pts`));
+  $('progress-metrics').replaceChildren(metric('Sessions',summary.attempts.length,true),metric('Best score',display(summary.best)),metric('Practice minutes',summary.minutes.toFixed(1)),metric('Since first take',summary.improvement===null?'—':`${summary.improvement>=0?'+':''}${Math.round(summary.improvement)} pts`));
   const host=$('progress-chart');host.replaceChildren();
   if(summary.graded.length){const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 800 220');svg.setAttribute('role','img');svg.setAttribute('aria-label','Practice scores by attempt');
     for(const value of [0,50,100]){const y=185-value*1.55;const line=document.createElementNS(ns,'line');for(const [k,v]of Object.entries({x1:40,x2:780,y1:y,y2:y,stroke:'#e0e7ee'}))line.setAttribute(k,v);svg.append(line);const text=document.createElementNS(ns,'text');text.setAttribute('x','5');text.setAttribute('y',y+4);text.setAttribute('fill','#708398');text.setAttribute('font-size','12');text.textContent=value;svg.append(text);}
     const points=summary.graded.map((r,i)=>[50+i*720/Math.max(1,summary.graded.length-1),185-r.grade*1.55]);
     const path=document.createElementNS(ns,'polyline');path.setAttribute('points',points.map(p=>p.join(',')).join(' '));path.setAttribute('fill','none');path.setAttribute('stroke','#087f78');path.setAttribute('stroke-width','3');svg.append(path);
     points.forEach(([x,y],i)=>{const dot=document.createElementNS(ns,'circle');for(const [k,v]of Object.entries({cx:x,cy:y,r:5,fill:'#087f78'}))dot.setAttribute(k,v);const title=document.createElementNS(ns,'title');title.textContent=`Attempt ${i+1}: ${summary.graded[i].grade.toFixed(1)}`;dot.append(title);svg.append(dot);});host.append(svg);
-  }else{const p=document.createElement('p');p.className='intro';p.textContent='Your first completed assessment starts this chart. Each take is a chance to notice something new.';host.append(p);}
+  }else{const p=document.createElement('p');p.className='intro';p.textContent='Finish a graded take on this passage to start its chart.';host.append(p);}
   $('attempts').replaceChildren();
   const attempts=$('history-filter').value==='all'?recordStore:summary.attempts;
   renderJournal(attempts);
@@ -258,13 +295,13 @@ function renderJournal(records){
   select.replaceChildren(new Option('New session without a recording',''));
   const counts=new Map();
   for(const record of [...records].reverse()){
-    select.add(new Option(record.title+' ? '+new Date(record.date).toLocaleString(),String(recordStore.indexOf(record))));
+    select.add(new Option(record.title+' · '+new Date(record.date).toLocaleString(),String(recordStore.indexOf(record))));
     const kinds=new Set(Number.isFinite(record.grade)?record.findings.map(f=>f.kind):[]);
     if(record.mistake)kinds.add(record.mistake);
     for(const kind of kinds)counts.set(kind,(counts.get(kind)||0)+1);
   }
   $('journal-patterns').textContent=[...counts].filter(([,n])=>n>=2).sort((a,b)=>b[1]-a[1])
-    .map(([kind,n])=>kind+' ? '+n+' sessions').join(', ')||'Patterns appear after two sessions with the same mistake.';
+    .map(([kind,n])=>kind+' · '+n+' sessions').join(', ')||'Patterns appear after two sessions with the same mistake.';
   select.onchange=()=>{
     const record=select.value===''?null:recordStore[Number(select.value)];
     $('journal-focus').value=record?.focus||'';
@@ -295,7 +332,7 @@ function attemptRow(record){
   const small=document.createElement('small');small.textContent=`${new Date(record.date).toLocaleString()} · ${Coach.profiles[record.instrument]?.name||record.instrument} · ${Math.round(record.practiceSeconds??record.duration)}s · ${record.passage||'Whole piece'}`;text.append(small);
   const button=document.createElement('button');button.className='secondary';button.textContent=record.result?.passage?display(record.result.passage.grade)+'/100 - Excerpt report':record.grade==null?'Open ungraded report':`${record.grade.toFixed(1)} / 100 · View report`;button.onclick=()=>openRecord(record);if(record.focus||record.notes){
     const detail=document.createElement('p');
-    detail.textContent=[record.focus,record.notes].filter(Boolean).join(' ? ');
+    detail.textContent=[record.focus,record.notes].filter(Boolean).join(' · ');
     text.append(detail);
   }
   row.append(text);
@@ -304,10 +341,10 @@ function attemptRow(record){
 }
 function replay(seconds){if(phase!=='idle')return;if(!recordingId){notice('No saved audio is available for this report.');return;}if(window.Android?.replayTake)Android.replayTake(recordingId,seconds);else notice('Audio replay is available in the Android app.');}
 function renderHome(){
-  const totals=store.summary();$('home-metrics').replaceChildren(metric('Practice attempts',totals.attempts,true),metric('Practice minutes',totals.minutes.toFixed(1)),metric('Pieces practiced',totals.pieces),metric('Saved scores',store.library().length+1));
+  const totals=store.summary();$('home-metrics').hidden=totals.attempts===0;$('home-metrics').replaceChildren(metric('Sessions',totals.attempts,true),metric('Practice minutes',totals.minutes.toFixed(1)),metric('Pieces practiced',totals.pieces),metric('Saved scores',store.library().length+1));
   $('home-piece').textContent=score.title;$('home-instrument').textContent=`${Coach.profiles[$('instrument').value].name} · ${score.measures.length} measures · ${selection?'Measure '+selection.label:'Whole piece'}`;
   $('home-recent').replaceChildren();for(const record of [...recordStore].reverse().slice(0,4))$('home-recent').append(attemptRow(record));
-  if(!recordStore.length){const p=document.createElement('p');p.className='empty-state';p.textContent='Your practice story starts with one take. Open the bundled melody or import your own score.';$('home-recent').append(p);}
+  if(!recordStore.length){const p=document.createElement('p');p.className='empty-state';p.textContent='Your saved takes and journal entries will appear here.';$('home-recent').append(p);}
 }
 function renderLibrary(){
   let host=$('saved-scores');if(!host){host=document.createElement('section');host.id='saved-scores';$('library-page').append(host);}host.replaceChildren();
@@ -384,7 +421,7 @@ $('hear-score').onclick=async()=>{
   try{await ScoreDemo.play(score,selection,reset);}
   catch(error){reset();notice('Score playback failed: '+error.message);}
 };
-$('change-piece').onclick=()=>setPage('library');$('whole-piece').onclick=()=>{ScoreDemo.stop();rangeStart=null;selection=null;resetReport();$('follow-label').textContent='Your score';$('score-subtitle').textContent='Tap the first and last measures to practice a range';notice('Whole piece selected.');};
+$('change-piece').onclick=()=>setPage('library');$('whole-piece').onclick=()=>{ScoreDemo.stop();rangeStart=null;selection=null;resetReport();showSelection();promptForPassage();notice('');};
 $('twinkle').onclick=()=>openPiece('twinkle');
 $('start').onclick=()=>begin();$('stop').onclick=()=>{if(window.Android){$('stop').disabled=true;Android.stop();}};
 $('audio-upload').onclick=()=>begin(true);$('score-upload').onclick=()=>window.Android?Android.importFile('score'):notice('Open the Android APK to import scores from your tablet.');
@@ -400,7 +437,7 @@ changeScore(twinkle($('instrument').value));
 if(settings.pieceId&&settings.pieceId!=='twinkle'){
   const saved=store.library().find(p=>p.id===settings.pieceId);if(saved){partIndex=Number(settings.partIndex)||0;if(changeScore(saved.xml)){builtin=false;pieceId=saved.id;}else{partIndex=0;changeScore(twinkle($('instrument').value));}}
 }
-$('home-continue').onclick=() => setPage('practice');$('home-open-score').onclick=()=>setPage('practice');$('home-library').onclick=()=>setPage('library');$('home-import').onclick=()=>$('score-upload').click();$('home-history').onclick=()=>{$('history-filter').value='all';setPage('progress');};$('history-filter').onchange=renderProgress;
+$('home-continue').onclick=() => setPage('practice');$('home-library').onclick=()=>setPage('library');$('home-import').onclick=()=>$('score-upload').click();$('home-history').onclick=()=>{$('history-filter').value='all';setPage('progress');};$('history-filter').onchange=renderProgress;
 const referenceStop=document.createElement('button');referenceStop.id='stop-reference';referenceStop.className='text-button';referenceStop.textContent='Stop playback';referenceStop.onclick=()=>window.Android?.stopPlayback&&Android.stopPlayback();$('reference-upload').parentElement.append(referenceStop);
 const takeStop=document.createElement('button');takeStop.id='stop-take-playback';takeStop.className='text-button';takeStop.textContent='Stop playback';takeStop.onclick=()=>window.Android?.stopPlayback&&Android.stopPlayback();$('replay-full').parentElement.append(takeStop);
 const micSettings=document.createElement('button');micSettings.id='microphone-settings';micSettings.className='text-button';micSettings.textContent='Microphone settings';micSettings.onclick=()=>{if(phase!=='idle'){notice('Finish or cancel the current take first.');return;}if(window.Android?.openMicrophoneSettings)Android.openMicrophoneSettings();else notice('Microphone settings are available in the Android app.');};$('audio-status').parentElement.append(micSettings);

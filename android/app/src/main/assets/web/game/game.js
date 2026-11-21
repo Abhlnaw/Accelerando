@@ -126,7 +126,9 @@ function cancel(){
 }
 async function finish(){
   if(run?.native){$('play').disabled=true;Android.stop();return;}
-  const r=run;if(!r||!r.rec||r.rec.state!=='recording')return;
+  const r=run;if(!r)return;
+  if(!r.rec){cancel();message('Run cancelled.');return;}
+  if(r.rec.state!=='recording')return;
   clearInterval(r.timer);$('play').disabled=true;r.segmenter.finish();const result=assess(r,false);
   r.rec.onstop=async()=>{
     release(r);if(run!==r)return;
@@ -143,6 +145,7 @@ async function start(){
   const r={score:lines[+$('line').value].score,key:key(),segmenter:new Coach.Segmenter(),chunks:[]};run=r;
   try{
     if(window.Android?.start){r.native=true;heard='';Android.start(24,95);return;}
+    $('play').textContent='Cancel';$('play').disabled=false;
     r.ctx=new AudioContext();await r.ctx.resume();if(id!==ticket)return;
     r.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
     if(id!==ticket){release(r);return;}
@@ -176,9 +179,13 @@ $('preview').onclick=async()=>{
 window.gameBusy=()=>Boolean(run);
 window.gameEvent=(type,data)=>{
   const r=run;
-  if(type==='error'){cancel();message(data.message);return true;}
+  if(type==='error'){
+    if(r?.sessionId!=null && data.sessionId!=null && r.sessionId!==data.sessionId)return true;
+    if(r?.native && data.scope!=='playback')cancel();
+    message(data.message);return true;
+  }
   if(!r?.native)return ['playback','importing','cancelled','stopped'].includes(type);
-  if(type==='loading'){r.sessionId=data.sessionId;message(data.message);return true;}
+  if(type==='loading'){r.sessionId=data.sessionId;message(data.message);$('play').textContent='Cancel';$('play').disabled=false;return true;}
   if(r.sessionId!=null && data.sessionId!=null && r.sessionId!==data.sessionId)return true;
   if(type==='started'){message('Recording · CREPE live');$('play').disabled=false;$('play').textContent='Finish run';return true;}
   if(type==='cancelled'){cancel();message(data.message);return true;}

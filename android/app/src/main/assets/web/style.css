@@ -176,3 +176,28 @@ nav { flex-wrap: wrap; }
 }
 
 #score .playing { outline: 3px solid #007f91; outline-offset: 4px; filter: drop-shadow(0 0 3px #59ecff); }
+
+body:not([data-page="home"]) header {
+  margin-bottom: 16px;
+  padding: 0;
+  color: var(--ink);
+  background: transparent;
+}
+body:not([data-page="home"]) header .eyebrow { display: none; }
+body:not([data-page="home"]) h1 { font-size: clamp(30px, 3vw, 44px); }
+.resume-card .primary { margin-top: 12px; }
+.settings details { margin: 0; padding: 10px 14px; align-self: end; }
+.transport { border-top: 1px solid var(--line); }
+#score rect[aria-pressed="true"] { fill: #bd87341a; stroke: #95632b; stroke-width: 2px; }
+#report { padding-top: 16px; scroll-margin-top: 12px; }
+#report .section-heading { margin-bottom: 14px; }
+.journal-editor { margin-bottom: 16px; }
+#journal-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+#journal-form textarea { min-height: 78px; padding: 8px; border: 1px solid var(--line); border-radius: 5px; font: inherit; }
+#journal-form button { justify-self: start; align-self: end; }
+@media (max-width: 540px) {
+  #journal-form { grid-template-columns: minmax(0, 1fr); }
+  .score-toolbar, .attempt { flex-wrap: wrap; }
+  .score-toolbar > span { flex-basis: 100%; }
+  .attempt, .resume-card, .metric { overflow-wrap: anywhere; }
+}

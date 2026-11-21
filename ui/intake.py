@@ -22,21 +22,26 @@ class Completed:
     title: str
     request: Request
     analysis: Analysis
+    piece_title: str = ""
 
 
 def completed() -> Completed | None:
     return st.session_state.get(_COMPLETED)
 
 
-def analysis_action(source: str, title: str, request: Request | None, *, on_recording=False):
+def invalidate_changed_take(source, identity):
+    previous = completed()
+    if previous and previous.source == source and previous.identity != identity:
+        st.session_state.pop(_COMPLETED)
+
+
+def analysis_action(source: str, title: str, request: Request | None, *, on_recording=False, piece_title=""):
     identity = None
     if request:
         identity = sha256(
             f"{request.key}\0{request.audio_name}\0{request.score_name}".encode()
         ).hexdigest()
-    previous = completed()
-    if previous and previous.source == source and previous.identity != identity:
-        st.session_state.pop(_COMPLETED)
+    invalidate_changed_take(source, identity)
 
     submitted = st.button("Analyze take", type="primary", icon=":material/arrow_forward:",
                           disabled=request is None, key=f"analyze_{source}")
@@ -66,6 +71,6 @@ def analysis_action(source: str, title: str, request: Request | None, *, on_reco
             status.update(label=f"Stopped at {stage.lower()}", state="error")
             st.error("Analysis could not finish. Try again and share the processing stage with the team if it repeats.")
             return
-        st.session_state[_COMPLETED] = Completed(source, identity, title, request, analysis)
+        st.session_state[_COMPLETED] = Completed(source, identity, title, request, analysis, piece_title)
         status.update(label="Analysis complete", state="complete", expanded=False)
     st.switch_page("ui/results.py")

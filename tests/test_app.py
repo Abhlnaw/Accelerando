@@ -1,4 +1,5 @@
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -20,6 +21,20 @@ def open_app(page: str | None = None, timeout: int = 30):
 
 
 class AppTests(unittest.TestCase):
+    def test_invalid_journal_entry_keeps_history_and_success_clears_draft(self):
+        with TemporaryDirectory() as directory, patch("practice_journal.DATABASE", Path(directory) / "sessions.db"):
+            app = open_app("journal")
+            focus = next(field for field in app.text_input if field.label == "What did you work on?")
+            focus.set_value("Measure two entrance")
+            app.button[0].click().run()
+            self.assertFalse(app.exception)
+            self.assertTrue(app.success)
+            self.assertEqual(next(field.value for field in app.text_input if field.label == focus.label), "")
+            app.button[0].click().run()
+            self.assertTrue(app.error)
+            self.assertEqual(len(app.expander), 1)
+            self.assertIn("Measure two entrance", app.expander[0].label)
+
     def test_finishing_microphone_take_runs_assessment_with_selected_score(self):
         score = SimpleNamespace(name="score.xml", getvalue=lambda: b"score")
         recording = SimpleNamespace(name="recording.wav", getvalue=lambda: b"mic samples")

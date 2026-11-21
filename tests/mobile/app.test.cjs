@@ -119,6 +119,20 @@ test('selecting first and third measures includes the middle measure',()=>{
  for(const i of [0,2])measures[i].dispatchEvent(new app.document.defaultView.Event('click'));
  assert.equal(app.run('activeScore().measures.length'),3);
  assert.equal(app.run('selection.label'), '1'+String.fromCharCode(0x2013)+'3');
+ assert.equal(app.document.querySelectorAll('#score [aria-pressed=true]').length,3);
+ app.run('renderScore()');
+ assert.equal(app.document.querySelectorAll('#score [aria-pressed=true]').length,3);
+ app.click('whole-piece');
+ assert.equal(app.document.querySelectorAll('#score [aria-pressed=true]').length,0);
+ const fourth=app.document.querySelectorAll('#score rect[role=button]')[3];
+ fourth.dispatchEvent(new app.document.defaultView.Event('click'));
+ assert.equal(app.document.getElementById('coach-title').textContent,'Start on D4');
+});
+test('a retained report disables every replay action when its audio is missing',()=>{
+ const app=boot();
+ app.run("Android.hasRecording=()=>false; recordingId='evicted'; showReport({grade:80, fraction:1, findings:[{kind:'pitch',measure:'2',message:'Tune the entrance',time:2}]})");
+ assert.equal(app.document.getElementById('replay-full').disabled,true);
+ assert.equal(app.document.querySelector('#findings button').disabled,true);
 });
 test('microphone finishes once after singing then trailing silence',()=>{
  const app=boot();app.click('home-continue');app.click('start');

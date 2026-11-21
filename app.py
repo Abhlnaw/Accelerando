@@ -19,7 +19,7 @@ def main():
         st.Page("ui/game.py", title="Score run", icon=":material/sports_esports:", url_path="game"),
         st.Page("ui/examples.py", title="Examples", icon=":material/library_music:", url_path="examples"),
         st.Page("ui/results.py", title="Results", icon=":material/analytics:", url_path="results"),
-        st.Page("ui/journal.py", title="Practice journal", icon=":material/book:", url_path="journal"),
+        st.Page("ui/journal.py", title="Journal", icon=":material/book:", url_path="journal"),
         st.Page("ui/guide.py", title="How it works", icon=":material/help:", url_path="guide"),
     ]
     current = st.navigation(pages, position="hidden")

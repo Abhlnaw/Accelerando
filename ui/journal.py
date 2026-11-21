@@ -14,22 +14,32 @@ intro("Practice journal", "Log your sessions and see how your playing develops."
 take = completed()
 attach = take and st.checkbox(f"Include assessment from {take.title}", value=take.source == "practice")
 result = take.analysis.result if attach else None
-with st.form("journal_entry", clear_on_submit=False):
+if st.session_state.pop("journal_saved", False):
+    st.success("Session saved.")
+entry = st.session_state.get("journal_entry_number", 0)
+with st.form(f"journal_entry_{entry}"):
     day = st.date_input("Practice date", max_value=date.today())
     minutes = st.number_input("Minutes practiced", min_value=1, max_value=1440, value=15)
-    piece = st.text_input("Piece or exercise", value=take.request.score_name if attach else "",
+    piece = st.text_input("Piece or exercise", value=(take.piece_title or take.request.score_name) if attach else "",
                           key=f"journal_piece_{take.identity if attach else 'manual'}")
     focus = st.text_input("What did you work on?")
     notes = st.text_area("Personal notes and goals for next time")
     manual = st.multiselect("Mistakes you noticed", ["Pitch", "Rhythm", "Missing notes", "Extra notes", "Articulation"])
     submitted = st.form_submit_button("Save session", type="primary")
 
-try:
-    if submitted:
+if submitted:
+    try:
         labels = {"pitch": "Pitch", "rhythm": "Rhythm", "missing": "Missing notes", "extra": "Extra notes"}
         detected = [labels[f.kind] for f in result.findings if f.kind in labels] if result and result.status == "ok" else []
         journal.save(day, minutes, focus, notes, piece.strip(), result.grade if result else None, manual + detected)
-        st.success("Session saved.")
+    except (OSError, sqlite3.Error, ValueError) as error:
+        st.error(str(error))
+    else:
+        st.session_state.journal_saved = True
+        st.session_state.journal_entry_number = entry + 1
+        st.rerun()
+
+try:
     rows = journal.sessions()
 except (OSError, sqlite3.Error, ValueError) as error:
     st.error(str(error))

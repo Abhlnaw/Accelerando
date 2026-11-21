@@ -1,6 +1,7 @@
 import streamlit as st
 
 from ui.design import asset_url
+from ui.intake import completed
 
 
 def studio():
@@ -9,25 +10,27 @@ def studio():
         st.html(f"""
             <style>.st-key-studio_hero {{ --piano-photo: url("{artwork}"); }}</style>
             <div class="hero-copy">
-                <p class="overline">Solo music practice</p>
-                <h1>Make your next<br><em>take count.</em></h1>
-                <p class="hero-description">Play a phrase, see how it lines up with the score,
-                    and hear exactly where to focus your next take.</p>
+                <p class="overline">Your practice studio</p>
+                <h1>Hear the note.<br><em>Find the measure.</em></h1>
+                <p class="hero-description">Play a solo melody. Accelerando follows the written score
+                    and points you to the moment worth practicing again.</p>
             </div>
         """)
         with st.container(horizontal=True, gap="small", key="studio_actions"):
-            if st.button("Start a practice take", type="primary", icon=":material/arrow_forward:"):
-                st.switch_page("ui/practice.py")
-            if st.button("Explore examples"):
+            if st.button("Try a bundled example", type="primary", icon=":material/play_arrow:"):
                 st.switch_page("ui/examples.py")
+            if st.button("Start a practice take"):
+                st.switch_page("ui/practice.py")
 
-    st.header("Your practice room", anchor=False)
+    st.header("Practice between takes", anchor=False)
     with st.container(key="studio_paths"):
         columns = st.columns(3, gap="medium")
         destinations = (
-            ("Practice with your score", "Pair a solo WAV with its MusicXML score.", "ui/practice.py", ":material/mic:", "Upload a take"),
-            ("Try an example", "Compare a steady take, an expressive slowdown, and a pitch variation.", "ui/examples.py", ":material/library_music:", "Browse examples"),
-            ("Review your feedback", "Replay a flagged passage and see the evidence behind your grade.", "ui/results.py", ":material/analytics:", "Open results"),
+            ("Tune and warm up", "Check your pitch against a drone or set a pulse.", "ui/tools.py", ":material/tune:", "Open practice tools"),
+            ("Play a score run", "Follow a written line and track your score as you play.", "ui/game.py", ":material/sports_esports:", "Open score run"),
+            ("Review your take", "Listen to the marked passages from your latest take.", "ui/results.py", ":material/analytics:", "Open results")
+            if completed() else
+            ("Keep a practice journal", "Log your minutes, recurring mistakes and next steps.", "ui/journal.py", ":material/book:", "Open journal"),
         )
         for column, (title, copy, page, icon, label) in zip(columns, destinations):
             with column:

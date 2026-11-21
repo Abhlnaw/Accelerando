@@ -4,7 +4,7 @@ from contracts import InputError
 import pipeline
 from pipeline import Request
 from ui.design import intro
-from ui.intake import analysis_action
+from ui.intake import analysis_action, invalidate_changed_take
 from ui.score_demo import show_demo
 
 
@@ -20,27 +20,17 @@ def examples():
     try:
         pieces = pipeline.load_catalog()
         if not pieces:
+            invalidate_changed_take("examples", None)
             st.info("The example library is empty. Upload a performance and matching score to start.")
             st.page_link("ui/practice.py", label="Go to Practice", icon=":material/mic:")
             return
         piece_ids = [item["piece_id"] for item in pieces]
         saved_piece = st.session_state.get("saved_example_piece", piece_ids[0])
         selected_piece = saved_piece if saved_piece in piece_ids else piece_ids[0]
-        with st.container(key="examples_library"):
-            columns = st.columns(min(len(pieces), 2), gap="medium")
-            for index, item in enumerate(pieces):
-                piece_id = item["piece_id"]
-                title = item.get("title", piece_id)
-                with columns[index % len(columns)]:
-                    with st.container(border=True, key=f"example_card_{index}"):
-                        st.caption(excerpt_label(item))
-                        st.subheader(title, anchor=False)
-                        st.write("Reference available" if item.get("references") or item.get("reference_path")
-                                 else "Score-only analysis")
-                        if st.button(f"Select {title}", key=f"choose_example_{index}",
-                                     disabled=selected_piece == piece_id):
-                            st.session_state.saved_example_piece = piece_id
-                            st.rerun()
+        titles = {item["piece_id"]: item.get("title", item["piece_id"]) for item in pieces}
+        selected_piece = st.selectbox("Piece", piece_ids, index=piece_ids.index(selected_piece),
+                                      format_func=titles.get)
+        st.session_state.saved_example_piece = selected_piece
         piece = pieces[piece_ids.index(selected_piece)]
         title = piece.get("title", selected_piece)
         recordings = piece.get("takes", [])
@@ -49,7 +39,8 @@ def examples():
             analysis_action("examples", title, None)
             return
         with st.container(border=True, key="example_player"):
-            st.subheader(f"Listen to {title}", anchor=False)
+            comparison = "With reference recording" if piece.get("references") or piece.get("reference_path") else "Score-only analysis"
+            st.caption(f"{excerpt_label(piece)} · {comparison}")
             saved_take = st.session_state.get(f"saved_recording_{selected_piece}", 0)
             index = st.radio("Performance", list(range(len(recordings))),
                              format_func=lambda i: recordings[i]["label"],
@@ -63,10 +54,10 @@ def examples():
                               audio_path.name, score_path.name)
             st.audio(request.audio_bytes, format="audio/wav")
             st.caption(recording.get("source", piece.get("source", "Source unavailable")))
-            st.download_button("Download MusicXML", request.score_bytes, request.score_name,
-                               mime="application/vnd.recordare.musicxml+xml")
+            analysis_action("examples", f"{title} · {recording['label']}", request, piece_title=title)
         show_demo(request.score_bytes)
-        analysis_action("examples", f"{title} · {recording['label']}", request)
+        st.download_button("Download MusicXML", request.score_bytes, request.score_name,
+                           mime="application/vnd.recordare.musicxml+xml")
     except (InputError, OSError, KeyError) as exc:
         st.error(f"Cannot open this example. {exc}")
         analysis_action("examples", "Example", None)

@@ -137,7 +137,7 @@
 .st-key-studio_hero {
   padding: clamp(2rem, 4.4vw, 4rem);
   padding-block: clamp(2rem, 3.3vw, 3rem);
-  min-height: 27.2rem;
+  min-height: 23rem;
   justify-content: center;
   border-radius: 1rem;
   background-color: var(--walnut);
@@ -205,7 +205,7 @@
   background: #4b352a;
 }
 
-.st-key-studio_paths :is(.st-key-studio_practice_card, .st-key-studio_examples_card, .st-key-studio_results_card) {
+.st-key-studio_paths [data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] {
   background: var(--paper);
   min-height: 10rem;
 }

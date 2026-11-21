@@ -3,6 +3,23 @@
 The home page and local practice workflow have automated coverage. This document
 distinguishes packaged runtime checks from logic checks and physical-device work.
 
+### Tidal Hack demo review
+
+The source review passed 59 Python tests, 51 JavaScript tests and nine JVM tests.
+In Edge, the desktop route **Studio → Try a bundled example → Porch Light →
+Pitch variation → Analyze take** ran CREPE tiny on the bundled synthetic WAV.
+It returned 96.5/100, assessed all written attacks and identified measure 2.
+Score Run recorded a browser-simulated microphone, produced a replay and saved
+the run in history. The tuner, metronome and drone each started and stopped.
+
+The tablet web interface rendered real VexFlow notation, highlighted a three-bar
+selection, played the selection and opened all six destinations in Edge. Home,
+Practice, Progress and Library fit a 390-pixel viewport without horizontal page
+scrolling. Android permission handling, native capture and acoustic latency on
+physical hardware still need a device check for this revision.
+
+### Earlier packaged build
+
 Verified on 2026-11-21: 57 Python regression tests, 38 JavaScript logic/controller
 tests, seven native decoder unit tests and three Android emulator tests. The Android
 runtime suite passed on the phone viewport before integrating practice tools and

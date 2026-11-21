@@ -109,7 +109,8 @@ def _references(analysis: Analysis):
 
 def _diagnostics(analysis: Analysis):
     st.subheader("Analysis details", anchor=False)
-    st.write("CREPE supplies the pitch estimates. Accelerando groups them into notes, aligns those notes with the score, and calculates the grade.")
+    st.write(f"Pitch tracker for this take · {analysis.take.method}")
+    st.write("Accelerando groups the pitch estimates into notes, aligns them with the score, and calculates the grade.")
     for warning in analysis.result.warnings:
         if warning in _WARNINGS:
             st.warning(_WARNINGS[warning])
