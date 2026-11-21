@@ -143,7 +143,7 @@
           let previous=0;
           for(let j=1;j<=heard.length;j++) {
             const old=row[j];
-            row[j]=Math.max(row[j-1],old,previous+Number(Math.abs(heard[j-1].midi+shift-note.midi)<=.65));
+            row[j]=Math.max(row[j-1],old,previous+Number(Math.abs(heard[j-1].midi+shift-note.midi)<=(voice ? 1.25 : .65)));
             previous=old;
           }
         }

@@ -35,6 +35,18 @@ melodies and comparison takes are labeled synthetic. A permitted recorded flute
 clip is included for real-performance inference checks. The separate development
 preview contains invented results and never feeds the upload pipeline.
 
+## Score run
+
+Choose a saved piece and written line, listen to its preview, then record a run.
+The playfield follows the performed notes with live pitch and timing judgments.
+The musical grade uses the expressive pitch, coverage and local rhythm weights.
+Arcade points scale that grade to 10,000 and advance with matched notes during
+the run. A combo counts consecutive clean matches. Finish to replay a finding
+and compare grades in the local history for that piece and line.
+
+Android consumes on-device CREPE frames and replays the saved native take.
+The browser uses microphone pitch detection and keeps the latest replay while
+the run is open. Both use the same note segmentation and assessment code.
 ## Start
 
 Use standard Windows CPython 3.12 (not the MSYS Python on PATH on this laptop):

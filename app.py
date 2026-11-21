@@ -16,6 +16,7 @@ def main():
         st.Page("ui/studio.py", title="Studio", icon=":material/home:", default=True),
         st.Page("ui/practice.py", title="Practice", icon=":material/mic:", url_path="practice"),
         st.Page("ui/tools.py", title="Practice tools", icon=":material/tune:", url_path="tools"),
+        st.Page("ui/game.py", title="Score run", icon=":material/sports_esports:", url_path="game"),
         st.Page("ui/examples.py", title="Examples", icon=":material/library_music:", url_path="examples"),
         st.Page("ui/results.py", title="Results", icon=":material/analytics:", url_path="results"),
         st.Page("ui/journal.py", title="Practice journal", icon=":material/book:", url_path="journal"),

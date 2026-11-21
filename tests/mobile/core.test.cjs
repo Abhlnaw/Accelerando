@@ -120,3 +120,20 @@ test('one wrong note in a recognizable four-note measure still gets a score',()=
  const result=C.assess(s,events);
  assert.ok(result.grade>0&&result.grade<100);
 });
+test('live run uses the same weighted assessment while withholding a premature final grade',()=>{
+ const s=score(),events=take(s);
+ assert.equal(C.assess(s,events.slice(0,1),{partial:true}).provisionalGrade,null);
+ events[4].midi+=1;
+ const live=C.assess(s,events,{partial:true}),final=C.assess(s,events);
+ assert.equal(live.grade,null);
+ assert.equal(live.provisionalGrade,final.grade);
+ assert.ok(final.grade<100 && final.grade>0);
+ assert.ok(live.findings.some(f=>f.kind==='pitch'));
+});
+
+test('recognizable lower voice singing 85 cents flat receives pitch feedback',()=>{
+ const melody=score(),events=take(melody).map(event=>({...event,midi:event.midi-12.85}));
+ const report=C.assess(melody,events,{voice:true});
+ assert.ok(report.grade>0 && report.grade<100);
+ assert.ok(report.findings.some(f=>f.kind==='pitch'));
+});

@@ -21,6 +21,10 @@ def upload_field(label: str, formats: list[str], storage_key: str, hint: str):
     if value is not None:
         st.session_state[storage_key] = (value.name, value.getvalue())
     selected = st.session_state.get(storage_key)
+    if storage_key == "practice_score" and selected and len(selected[1]) <= 5 * 1024 * 1024:
+        from hashlib import sha256
+        library = st.session_state.setdefault("game_scores", {})
+        library[sha256(selected[1]).hexdigest()] = selected
     if selected and value is None:
         st.text(f"Selected · {selected[0]}")
     return selected

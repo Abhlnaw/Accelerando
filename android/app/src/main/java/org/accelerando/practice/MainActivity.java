@@ -81,7 +81,7 @@ public final class MainActivity extends Activity {
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
                 // Only the bundled entry page receives the bridge, never an imported document.
-                if(!request.isForMainFrame()&&"https".equals(request.getUrl().getScheme())&&"appassets.androidplatform.net".equals(request.getUrl().getHost())&&request.getUrl().getPath().startsWith("/tools/"))return false;
+                if(!request.isForMainFrame()&&"https".equals(request.getUrl().getScheme())&&"appassets.androidplatform.net".equals(request.getUrl().getHost())&&(request.getUrl().getPath().startsWith("/tools/") || "/game/index.html".equals(request.getUrl().getPath())))return false;
                 openExternal(request.getUrl().toString());return true;
             }
         });
@@ -217,6 +217,7 @@ public final class MainActivity extends Activity {
     @Override protected void onStop(){
         super.onStop();
         web.evaluateJavascript("document.querySelector('#tools-page iframe')?.contentWindow.stopPracticeTools?.()",null);
+        web.evaluateJavascript("document.querySelector('#game-page iframe')?.contentWindow.stopGame?.()",null);
     }
     static byte[] readLimited(InputStream in,int limit)throws IOException{
         ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] block=new byte[8192];int count;

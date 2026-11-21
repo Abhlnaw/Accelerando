@@ -46,7 +46,7 @@ function finish(app,id='take-first',session=1){
  app.run(`for(const note of score.notes){for(let i=0;i<16;i++)window.nativeEvent('frame',{sessionId:${session},time:note.onset*.6+i*.032,midi:note.midi,confidence:.95,rms:.1,inferenceMs:4});for(let i=16;i<19;i++)window.nativeEvent('frame',{sessionId:${session},time:note.onset*.6+i*.032,midi:0,confidence:0,rms:0,inferenceMs:0});}window.nativeEvent('stopped',{sessionId:${session},recordingId:'${id}',duration:4});`);
 }
 test('written-tempo cursor waits for sound then advances independently of earned notes',()=>{
- const app=boot();app.click('home-continue');app.click('start');
+ const app=boot();app.click('home-continue');app.document.getElementById('mode').value='written';app.click('start');
  app.run("nativeEvent('started',{}); nativeEvent('frame',{time:1,midi:0,confidence:0,rms:0})");
  assert.equal(app.run('session.clock'),undefined);
  app.run("for(let i=0;i<70;i++)nativeEvent('frame',{time:1.1+i*.032,midi:score.notes[0].midi,confidence:.62,rms:.001})");
@@ -112,4 +112,16 @@ test('removing a saved score preserves its report and correct recording without 
  const buttons=[...app.document.querySelectorAll('#saved-scores button')];buttons.find(b=>b.textContent==='Remove').click();app.document.querySelector('#remove-score button.primary').click();
  assert.equal(JSON.parse(app.persisted.get('library')).length,0);assert.equal(JSON.parse(app.persisted.get('history')).length,1);
  app.run('openRecord(recordStore[0])');app.document.querySelector('#legacy-report button.secondary').click();assert.deepEqual(app.calls.at(-1),['replay','retained',0]);
+});
+test('selecting first and third measures includes the middle measure',()=>{
+ const app=boot();app.click('home-continue');
+ const measures=app.document.querySelectorAll('#score rect[role=button]');
+ for(const i of [0,2])measures[i].dispatchEvent(new app.document.defaultView.Event('click'));
+ assert.equal(app.run('activeScore().measures.length'),3);
+ assert.equal(app.run('selection.label'), '1'+String.fromCharCode(0x2013)+'3');
+});
+test('microphone finishes once after singing then trailing silence',()=>{
+ const app=boot();app.click('home-continue');app.click('start');
+ app.run("nativeEvent('started',{message:'Listening through the tablet microphone'}); for(let i=0;i<130;i++)nativeEvent('frame',{time:i*.032,midi:60,confidence:i<15?.9:0,rms:i<15?.1:0})");
+ assert.equal(app.calls.filter(c=>c[0]==='stop').length,1);
 });
