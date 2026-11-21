@@ -21,7 +21,7 @@ if current and current not in uploads:
     uploads.append(current)
 payload = json.dumps([(n, b64encode(b).decode("ascii")) for n, b in uploads]).replace("<", "\\u003c")
 html = html.replace("<body>", f"<body><script>window.practiceUploads={payload}</script>")
-for name in ("../core.js", "../score-lines.js", "../tools/pitch.js", "library.js", "game.js"):
+for name in ("../core.js", "../score-lines.js", "../tools/pitch.js", "../score-demo.js", "library.js", "game.js"):
     script = (folder / name).read_text(encoding="utf-8-sig")
     html = html.replace(f'<script src="{name}"></script>', f"<script>{script}</script>")
 components.html(html, height=840, scrolling=True)
