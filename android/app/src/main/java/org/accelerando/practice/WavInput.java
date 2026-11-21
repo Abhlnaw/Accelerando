@@ -7,7 +7,8 @@ import java.nio.charset.StandardCharsets;
 final class WavInput {
     private final byte[] data;
     final int rate,channels,frames,offset;
-    private WavInput(byte[] data,int rate,int channels,int frames,int offset){this.data=data;this.rate=rate;this.channels=channels;this.frames=frames;this.offset=offset;}
+    private final int firstChannel,channelCount;
+    private WavInput(byte[] data,int rate,int channels,int frames,int offset,int firstChannel,int channelCount){this.data=data;this.rate=rate;this.channels=channels;this.frames=frames;this.offset=offset;this.firstChannel=firstChannel;this.channelCount=channelCount;}
     static WavInput parse(byte[] data)throws IOException{
         if(data==null||data.length<44||!tag(data,0).equals("RIFF")||!tag(data,8).equals("WAVE"))throw new IOException("Upload an uncompressed 16-bit PCM WAV recording.");
         int rate=0,channels=0,bits=0,format=0,offset=0,length=0;
@@ -21,14 +22,19 @@ final class WavInput {
         if(format!=1||bits!=16||channels<1||channels>2||rate<8000||rate>96000)throw new IOException("Export as a mono or stereo 16-bit PCM WAV, 8–96 kHz.");
         if(length==0||length%(2*channels)!=0)throw new IOException("This WAV has no complete audio frames. Export it again.");
         int frames=length/(2*channels);if(frames>(long)rate*180)throw new IOException("Trim the recording to 3 minutes or less.");
-        return new WavInput(data,rate,channels,frames,offset);
+        int firstChannel=0,channelCount=channels;
+        if(channels==2){double leftPower=0,rightPower=0,mixPower=0;
+            for(int i=0;i<frames;i++){double left=(short)integer(data,offset+4*i,2),right=(short)integer(data,offset+4*i+2,2);leftPower+=left*left;rightPower+=right*right;mixPower+=(left+right)*(left+right)*.25;}
+            if(mixPower<Math.max(leftPower,rightPower)*.0625){firstChannel=rightPower>leftPower?1:0;channelCount=1;}
+        }
+        return new WavInput(data,rate,channels,frames,offset,firstChannel,channelCount);
     }
     int samples16k(){return (int)((long)frames*16000/rate);}
     float sample16k(int index){
         double position=index*rate/16000.0;int first=(int)position,last=Math.min(first+1,frames-1);float a=0,b=0;
-        for(int channel=0;channel<channels;channel++){
-            a+=(short)integer(data,offset+2*(first*channels+channel),2)/32768f/channels;
-            b+=(short)integer(data,offset+2*(last*channels+channel),2)/32768f/channels;
+        for(int channel=firstChannel;channel<firstChannel+channelCount;channel++){
+            a+=(short)integer(data,offset+2*(first*channels+channel),2)/32768f/channelCount;
+            b+=(short)integer(data,offset+2*(last*channels+channel),2)/32768f/channelCount;
         }
         return (float)(a+(b-a)*(position-first));
     }

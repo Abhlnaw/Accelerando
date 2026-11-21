@@ -16,7 +16,7 @@ test('other instrument profiles and concert notation preserve sounding pitches',
  assert.equal(parse(xml(note()),{profile:'piano'}).notes[0].midi,72);
  assert.equal(parse(xml(note()),{profile:'clarinet'}).notes[0].midi,70);
  assert.equal(parse(xml(note()),{profile:'saxophone'}).notes[0].midi,63);
- assert.equal(Object.keys(C.profiles).length,11);
+ assert.equal(C.profiles.auto.transpose,0);
 });
 test('rests and ties preserve offsets and a single attack',()=>{
  const source=xml(note('C',5,'<tie type="start"/>')+note('C',5,'<tie type="stop"/>')+'<note><rest/><duration>1</duration></note>'+note('D'));
@@ -81,4 +81,23 @@ test('frame grouping preserves repeated attacks, stable notes and pitch changes'
  for(let i=25;i<45;i++)segmenter.push({time:i*.032,midi:69,confidence:.9,rms:.1});
  for(let i=45;i<65;i++)segmenter.push({time:i*.032,midi:71,confidence:.9,rms:.1});
  segmenter.finish();assert.equal(segmenter.events.length,3);assert.deepEqual(segmenter.events.map(e=>e.midi),[69,69,71]);
+});
+
+test('automatic score matching finds the lower chord line without correcting a played mistake',()=>{
+ const lines=require('../../android/app/src/main/assets/web/score-lines.js');
+ const source=xml(['C','D','E','F'].map(n=>note(n,4)+note('G',5,'<chord/>')).join('')+
+   '<backup><duration>4</duration></backup>'+['F','E','D','C'].map(n=>note(n,3,'<voice>2</voice>')).join(''));
+ const candidates=lines.read(source,{profile:'piano',DOMParser});
+ assert.equal(candidates.length,3);
+ const heard=[60,62,63,65].map((midi,i)=>({midi,onset:i,confidence:.9}));
+ const match=lines.choose(candidates,heard);
+ assert.equal(match.ambiguous,false);
+ assert.deepEqual(match.line.score.notes.map(n=>n.midi),[60,62,64,65]);
+ assert.deepEqual(match.line.score.notes.map(n=>n.onset),[0,1,2,3]);
+ assert.equal(lines.choose(candidates,[]).ambiguous,true);
+});
+test('quiet reliable notes reach the mobile grader',()=>{
+ const segmenter=new C.Segmenter();
+ for(let i=0;i<16;i++)segmenter.push({time:i*.032,midi:50,confidence:.85,rms:.0004});
+ segmenter.finish();assert.equal(segmenter.events.length,1);
 });

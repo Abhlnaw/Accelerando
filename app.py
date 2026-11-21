@@ -15,6 +15,7 @@ def main():
     pages = [
         st.Page("ui/studio.py", title="Studio", icon=":material/home:", default=True),
         st.Page("ui/practice.py", title="Practice", icon=":material/mic:", url_path="practice"),
+        st.Page("ui/tools.py", title="Practice tools", icon=":material/tune:", url_path="tools"),
         st.Page("ui/examples.py", title="Examples", icon=":material/library_music:", url_path="examples"),
         st.Page("ui/results.py", title="Results", icon=":material/analytics:", url_path="results"),
         st.Page("ui/guide.py", title="How it works", icon=":material/help:", url_path="guide"),

@@ -20,6 +20,10 @@ public class WavInputTest {
     @Test public void lowSampleRateCanBeUpsampled()throws Exception{
         WavInput input=WavInput.parse(wav(8000,1,8000));assertEquals(16000,input.samples16k());assertEquals(.25,input.sample16k(15999),1e-6);
     }
+    @Test public void oppositePolarityStereoKeepsThePerformance()throws Exception{
+        byte[] bytes=wav(16000,2,100);for(int i=0;i<100;i++){bytes[44+i*4+2]=0;bytes[44+i*4+3]=(byte)0xe0;}
+        assertEquals(.25,WavInput.parse(bytes).sample16k(50),1e-6);
+    }
     @Test public void corruptEmptyAndTruncatedFilesFail()throws Exception{
         for(byte[] data:new byte[][]{new byte[0],wav(16000,1,0),Arrays.copyOf(wav(16000,1,100),100)})assertThrows(IOException.class,()->WavInput.parse(data));
     }

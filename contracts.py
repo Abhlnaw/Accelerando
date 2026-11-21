@@ -38,6 +38,7 @@ class Take:
     warnings: list[str] = field(default_factory=list)
     duration_s: float | None = None
     uncertain_regions: list[UncertainRegion] = field(default_factory=list)
+    acoustic_measurements: list[dict[str, float]] = field(default_factory=list)
 
 
 @dataclass

@@ -30,7 +30,8 @@ def guide():
     st.markdown(
         "- Record one melody without accompaniment.\n"
         "- Export a PCM WAV up to 45 seconds and 25 MiB.\n"
-        "- Upload a matching single-part MusicXML or XML score in concert pitch."
+        "- Upload the matching MusicXML score. Accelerando compares written parts, voices and chord tones "
+        "against your recorded pitches to identify the line you practiced."
     )
     st.caption("Analysis runs on the machine hosting this app. Results stay in the active browser session.")
     with st.container(border=True):

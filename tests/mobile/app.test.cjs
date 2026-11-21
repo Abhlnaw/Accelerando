@@ -22,7 +22,7 @@ function boot(persisted=new Map()){
  window.setTimeout=fn=>{fn();return 0;};window.console=console;
  const ctx=vm.createContext({document,DOMParser,Option:window.Option,localStorage:window.localStorage,Android:window.Android,Vex:window.Vex,console,setTimeout:window.setTimeout,addEventListener(){}});
  vm.runInContext('window=globalThis',ctx);
- for(const name of ['core.js','storage.js','app.js']){try{vm.runInContext(fs.readFileSync(path.join(assets,name),'utf8'),ctx,{filename:name});}catch(error){throw new Error(name+': '+document.getElementById('notice').textContent,{cause:error});}}
+ for(const name of ['core.js','score-lines.js','storage.js','app.js']){try{vm.runInContext(fs.readFileSync(path.join(assets,name),'utf8'),ctx,{filename:name});}catch(error){throw new Error(name+': '+document.getElementById('notice').textContent,{cause:error});}}
  return {window:ctx,document,calls,persisted,run:code=>vm.runInContext(code,ctx),click:id=>document.getElementById(id).click()};
 }
 const melody=`<score-partwise><work><work-title>My Tune</work-title></work><part id="P1"><measure number="1"><attributes><divisions>1</divisions></attributes>${['C','D','E','F','G','A'].map(s=>`<note><pitch><step>${s}</step><octave>5</octave></pitch><duration>1</duration></note>`).join('')}</measure></part></score-partwise>`;
@@ -35,6 +35,11 @@ test('home is the launch page, with working practice/library/progress navigation
  app.click('home-continue');assert.equal(app.document.getElementById('practice-page').hidden,false);assert.ok(app.document.querySelectorAll('#score svg').length>0);
  app.click('change-piece');assert.equal(app.document.getElementById('library-page').hidden,false);
  app.run("setPage('home')");app.click('home-history');assert.equal(app.document.getElementById('progress-page').hidden,false);
+});
+
+test('practice tools mount once and are removed when leaving the page',()=>{
+ const app=boot();app.run("setPage('tools');setPage('tools')");assert.equal(app.document.querySelectorAll('#tools-page iframe').length,1);assert.deepEqual(app.calls.at(-1),['stopPlayback']);
+ app.run("setPage('home')");assert.equal(app.document.querySelectorAll('#tools-page iframe').length,0);assert.equal(app.document.getElementById('home-page').hidden,false);
 });
 test('imported score and instrument settings survive a restart',()=>{
  const app=boot();app.window.nativeEvent('score',{xml:melody});assert.equal(app.document.getElementById('piece-title').textContent,'My Tune');
@@ -76,8 +81,8 @@ test('reference playback, audio upload and source search buttons reach the nativ
  app.click('imslp-search');assert.match(app.calls.at(-1)[1],/^https:\/\/imslp.org/);app.click('youtube-search');assert.match(app.calls.at(-1)[1],/^https:\/\/www.youtube.com/);
 });
 test('a playable second part is saved and restored when the first part is polyphonic',()=>{
- const app=boot();const multi=melody.replace('<part id="P1">','<part id="chords"><measure><attributes><divisions>1</divisions></attributes><note><chord/><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note></measure></part><part id="P1">');
- app.window.nativeEvent('score',{xml:multi});assert.equal(app.document.getElementById('part').value,'1');const restart=boot(app.persisted);assert.equal(restart.document.getElementById('part').value,'1');
+ const app=boot();const multi=melody.replace('<part id="P1">','<part id="chords"><measure><attributes><divisions>1</divisions></attributes><note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note><note><chord/><pitch><step>G</step><octave>4</octave></pitch><duration>1</duration></note></measure></part><part id="P1">');
+ app.window.nativeEvent('score',{xml:multi});app.document.getElementById('part').value='2';app.document.getElementById('part').onchange();assert.equal(app.document.getElementById('part').value,'2');const restart=boot(app.persisted);assert.equal(restart.document.getElementById('part').value,'2');
 });
 test('removing a saved score preserves its report and correct recording without showing another score',()=>{
  const app=boot();app.window.nativeEvent('score',{xml:melody});app.click('start');finish(app,'retained');app.run("setPage('library')");

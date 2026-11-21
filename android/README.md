@@ -7,7 +7,7 @@ No laptop server, Python installation, login or API key is needed on the tablet.
 ## Install and test on your tablet
 
 1. Build using the instructions below, or use the APK already built at
-   `android/app/build/outputs/apk/debug/app-debug.apk` (about 42 MB).
+   `android/app/build/outputs/apk/debug/app-debug.apk` (about 44 MB).
 2. Connect the tablet to the PC by USB and select **File transfer** on the tablet.
 3. Copy the APK to the tablet's Downloads folder. Open **My Files → Downloads**,
    tap the APK, and allow My Files to install this app if prompted. Tap Install.
@@ -35,8 +35,10 @@ This build has not yet been tested with the physical Tab S7 FE microphone.
 ## Other inputs
 
 - **Music library → Import MusicXML** accepts an uncompressed partwise `.musicxml`
-  or `.xml` file, up to 5 MB. Select the relevant part in a multiple-part score.
-  Imported scores and the selected part/instrument settings persist across restarts.
+  or `.xml` file, up to 5 MB. Choose a written line from parts, staves, voices or
+  chord tones, or leave **Match my recording** enabled to identify it after a take.
+  Ambiguous line matches remain ungraded.
+  Imported scores and selected line/instrument settings persist across restarts.
   The library has a 4-million-character storage budget and rejects additions if full.
 - **Upload a take** runs on-device inference on an uncompressed PCM16 WAV, mono
   or stereo, 8–96 kHz, at most 25 MB / 3 minutes. It uses the currently selected
@@ -50,7 +52,7 @@ This build has not yet been tested with the physical Tab S7 FE microphone.
 
 The model tracks one pitched melodic line across the selectable instrument
 profiles. Profiles handle notation transposition; they are not separate trained
-instrument models. Chords, overlapping voices, ensembles, percussion, automatic
+instrument models. Simultaneous performed chord grading, ensembles, percussion, automatic
 PDF recognition, compressed MXL and game mechanics are not implemented. The app
 rejects unsupported scores instead of assigning fabricated note assessments.
 It retains the latest 20 recordings with independent IDs for report replay;

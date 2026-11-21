@@ -5,6 +5,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
   'use strict';
   const profiles = {
+    auto: {name:'Automatic (use score pitch)', transpose:0, low:24, high:95},
     guitar: {name:'Guitar', transpose:-12, low:40, high:88},
     piano: {name:'Piano / keyboard', transpose:0, low:24, high:95},
     violin: {name:'Violin', transpose:0, low:55, high:95},
@@ -23,7 +24,8 @@
   const credit = (error,full,zero) => Math.max(0, Math.min(100,100*(zero-Math.abs(error))/(zero-full)));
   const pitchName = midi => ['C','C♯','D','E♭','E','F','F♯','G','A♭','A','B♭','B'][((Math.round(midi)%12)+12)%12]+(Math.floor(Math.round(midi)/12)-1);
   const frequency = midi => 440*2**((midi-69)/12);
-  function parseScore(xml, {profile='guitar', transpose='score', partIndex=0, DOMParser:Parser=globalThis.DOMParser}={}) {
+  function parseScore(xml, {profile='guitar', transpose='score', partIndex=0, projectedChordLine=false,
+                            DOMParser:Parser=globalThis.DOMParser}={}) {
     if(!profiles[profile])throw Error('Choose a supported instrument profile.');
     if (!xml || xml.length>5*1024*1024) throw Error('Choose a MusicXML file smaller than 5 MB.');
     if (/<!ENTITY|<!DOCTYPE[^>]*\[/i.test(xml)) throw Error('Export MusicXML without a custom DOCTYPE or entities.');
@@ -65,7 +67,7 @@
         if(duration<=0)throw Error('Each note and rest needs a positive duration.');
         if(![.125,.25,.375,.5,.75,1,1.5,2,3,4].includes(duration))throw Error('This notation duration is unsupported. Export a melodic excerpt with standard note lengths.');
         const rest=item.localName==='forward'||!!child(item,'rest');
-        if(rest){if(pending)throw Error('A tie cannot continue through a rest.');bar.events.push({rest:true,onset:cursor,duration});cursor+=duration;continue;}
+        if(rest){if(pending && !projectedChordLine)throw Error('A tie cannot continue through a rest.');pending=null;bar.events.push({rest:true,onset:cursor,duration});cursor+=duration;continue;}
         const p=child(item,'pitch');if(!p)throw Error('Unpitched percussion is not supported by this pitch model.');
         const step=text(p,'step'), octave=number(p,'octave',4), alter=number(p,'alter',0);
         const pc={C:0,D:2,E:4,F:5,G:7,A:9,B:11}[step];
@@ -73,12 +75,15 @@
         const written=12*(octave+1)+pc+alter, sounding=written+shift;
         if(!Number.isInteger(octave)||written<0||written>127||sounding<0||sounding>127)throw Error('Score pitches must be in the MIDI range.');
         const ties=Array.from(item.querySelectorAll('tie, tied')).map(t=>t.getAttribute('type'));
+        // A tied pitch may move to another chord rank in the next measure.
+        if(projectedChordLine && pending &&
+           (pending.midi!==sounding || !ties.some(t=>t==='stop'||t==='continue'))) pending=null;
         let attack;
         if(pending){
           if(!ties.some(t=>t==='stop'||t==='continue')||pending.midi!==sounding)throw Error('Tie continuations must stay on the same pitch.');
           attack=pending;attack.duration+=duration;
         }else{
-          if(ties.includes('stop'))throw Error('Include the start of each tie.');
+          if(ties.includes('stop') && !projectedChordLine)throw Error('Include the start of each tie.');
           attack={id:`m${mi+1}n${++ordinal}`,measure:printed,onset:cursor,duration,midi:sounding,written};result.notes.push(attack);
         }
         bar.events.push({rest:false,id:attack.id,midi:sounding,written,step,octave,alter,duration,onset:cursor,tie:!!pending});
@@ -86,7 +91,7 @@
       }
       if(bar.events.length)result.measures.push(bar);
     }
-    if(pending)throw Error('Include the end of the last tie.');
+    if(pending && !projectedChordLine)throw Error('Include the end of the last tie.');
     if(!result.notes.length)throw Error('This part has no pitched notes.');
     if(result.notes.length>500)throw Error('Select an excerpt of at most 500 notes for live practice.');
     result.duration=cursor;return result;
@@ -97,8 +102,9 @@
     finish(){if(this.current&&this.current.samples.length>=3){const c=this.current;this.events.push({onset:c.onset,end:c.end,midi:median(c.samples),confidence:median(c.confidences)});}this.current=null;this.pending=[];}
     push(frame){
       const {time:t,midi,confidence,rms}=frame;
-      if(rms<.0015||confidence<.60||!Number.isFinite(midi)){
-        if(rms>=.0015)this.uncertain.push(t);
+      if(confidence<.60||!Number.isFinite(midi)){
+        if(rms>=.00003)this.uncertain.push(t);
+        this.pending=[];
         this.lowEnergy=Math.min(this.lowEnergy,rms);
         if(this.current&&t-this.lastGood>.11)this.finish();
         this.previousEnergy=rms;return false;
@@ -172,7 +178,7 @@
       if(Math.abs(residual)>.25){if(colors[p.note.id]==='correct')colors[p.note.id]='rhythm';findings.push({kind:'rhythm',id:p.note.id,measure:p.note.measure,time:p.event.onset,
         message:`This entrance was ${Math.abs(residual).toFixed(2)} local beats ${residual>0?'late':'early'}. Tap the neighboring beats, then try the passage again.`});}
     }
-    const fraction=(matches.length+missing)/score.notes.length;
+    const fraction=score.notes.length?(matches.length+missing)/score.notes.length:0;
     const pitch=mean(matches.map(p=>credit((p.event.midi-p.note.midi)*100,35,100)));
     const coverage=matches.length?100*matches.length/(matches.length+missing+extra):null;
     const rhythm=mean(residuals.map(r=>credit(r,.15,.5)));
@@ -183,7 +189,7 @@
     const grade=!partial&&sufficient?available.reduce((s,[v,w])=>s+v*w,0)/available.reduce((s,[,w])=>s+w,0):null;
     const recognizable=partial?anchors.length>=Math.min(3,score.notes.length)&&anchors.length>=matches.length/2:sufficient;
     if(!recognizable)for(const id of Object.keys(colors))if(colors[id]!=='correct')delete colors[id];
-    const current=matches.at(-1)?.note.id||score.notes[0].id;
+    const current=matches.at(-1)?.note.id||score.notes[0]?.id;
     return {grade,pitch,coverage,rhythm,tempo:mode==='guided'?tempo:null,bpm,fraction,colors,current,path,findings:recognizable?findings.slice(0,12):[],
       status:sufficient?'ok':'insufficient_evidence',uncertain:uncertain.length,matched:matches.length,
       model:'CREPE tiny · ONNX · on device'};

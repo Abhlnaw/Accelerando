@@ -26,6 +26,7 @@ public final class MainActivity extends Activity {
     private volatile boolean cancelled;
     private int sessionSequence;
     private TakeRepository repository;
+    private PermissionRequest pendingTunerMic;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -39,6 +40,26 @@ public final class MainActivity extends Activity {
         web.getSettings().setAllowFileAccess(false);
         web.getSettings().setAllowContentAccess(false);
         web.getSettings().setMediaPlaybackRequiresUserGesture(true);
+        web.setWebChromeClient(new WebChromeClient(){
+            @Override public void onPermissionRequest(PermissionRequest request) {
+                boolean audio = java.util.Arrays.asList(request.getResources())
+                        .contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE);
+                if (busy || !audio || !"https://appassets.androidplatform.net".equals(
+                        request.getOrigin().toString().replaceAll("/$", ""))) {
+                    request.deny();
+                    return;
+                }
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED) {
+                    request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                } else if (pendingTunerMic == null) {
+                    pendingTunerMic = request;
+                    requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},44);
+                } else request.deny();
+            }
+            @Override public void onPermissionRequestCanceled(PermissionRequest request) {
+                if (pendingTunerMic == request) pendingTunerMic=null;
+            }
+        });
         web.setWebViewClient(new WebViewClient(){
             @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request) {
                 Uri uri=request.getUrl();
@@ -60,6 +81,7 @@ public final class MainActivity extends Activity {
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
                 // Only the bundled entry page receives the bridge, never an imported document.
+                if(!request.isForMainFrame()&&"https".equals(request.getUrl().getScheme())&&"appassets.androidplatform.net".equals(request.getUrl().getHost())&&request.getUrl().getPath().startsWith("/tools/"))return false;
                 openExternal(request.getUrl().toString());return true;
             }
         });
@@ -97,6 +119,7 @@ public final class MainActivity extends Activity {
         }
         @JavascriptInterface public void stop(){cancelled=true;if(engine!=null)engine.stop();}
         @JavascriptInterface public void stopPlayback(){runOnUiThread(()->{if(player!=null){player.release();player=null;}message("playback","Playback stopped.");});}
+        @JavascriptInterface public void stopReplay(){stopPlayback();}
         @JavascriptInterface public void importFile(String kind){
             if(busy)return;importKind=kind;
             runOnUiThread(()->{Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.setType("*/*");intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -147,7 +170,7 @@ public final class MainActivity extends Activity {
                 };
                 if(imported==null)instance.record(listener);else instance.analyzeWav(imported,listener);
                 if(instance.durationSeconds()<=.1){busy=false;audioState("cancelled","Take cancelled. Nothing was saved.",sessionId);return;}
-                String recordingId=repository.save(instance);
+                String recordingId=repository.save(instance,imported);
                 JSONObject finished=new JSONObject();finished.put("sessionId",sessionId);finished.put("recordingId",recordingId);finished.put("duration",instance.durationSeconds());
                 busy=false;event("stopped",finished);
             }catch(Exception ex){busy=false;audioState("error",ex.getMessage()==null?"Audio analysis failed. Please retry.":ex.getMessage(),sessionId);}
@@ -156,6 +179,12 @@ public final class MainActivity extends Activity {
     }
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){
         super.onRequestPermissionsResult(request,permissions,results);
+        if(request==44 && pendingTunerMic!=null){
+            if(!busy && results.length>0 && results[0]==PackageManager.PERMISSION_GRANTED)
+                pendingTunerMic.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+            else pendingTunerMic.deny();
+            pendingTunerMic=null;
+        }
         if(request==41){if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)begin(null);else error("audio","Microphone permission is needed. Tap Microphone settings to enable it, then retry.");}
     }
     @Override protected void onActivityResult(int request,int result,Intent data){
@@ -185,6 +214,10 @@ public final class MainActivity extends Activity {
     @Override protected void onPause(){super.onPause();cancelled=true;if(engine!=null)engine.stop();if(player!=null){player.release();player=null;}}
     @Override protected void onDestroy(){destroyed=true;cancelled=true;if(engine!=null)engine.stop();worker.shutdown();web.removeJavascriptInterface("Android");web.destroy();super.onDestroy();}
     @Override public void onBackPressed(){web.evaluateJavascript("window.appBack?window.appBack():false",handled->{if("false".equals(handled))MainActivity.super.onBackPressed();});}
+    @Override protected void onStop(){
+        super.onStop();
+        web.evaluateJavascript("document.querySelector('#tools-page iframe')?.contentWindow.stopPracticeTools?.()",null);
+    }
     static byte[] readLimited(InputStream in,int limit)throws IOException{
         ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] block=new byte[8192];int count;
         while((count=in.read(block,0,Math.min(block.length,limit+1-out.size())))>0){out.write(block,0,count);if(out.size()>limit)break;}

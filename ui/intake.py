@@ -28,7 +28,7 @@ def completed() -> Completed | None:
     return st.session_state.get(_COMPLETED)
 
 
-def analysis_action(source: str, title: str, request: Request | None):
+def analysis_action(source: str, title: str, request: Request | None, *, on_recording=False):
     identity = None
     if request:
         identity = sha256(
@@ -38,9 +38,13 @@ def analysis_action(source: str, title: str, request: Request | None):
     if previous and previous.source == source and previous.identity != identity:
         st.session_state.pop(_COMPLETED)
 
-    if not st.button("Analyze take", type="primary", icon=":material/arrow_forward:",
-                     disabled=request is None, key=f"analyze_{source}"):
+    submitted = st.button("Analyze take", type="primary", icon=":material/arrow_forward:",
+                          disabled=request is None, key=f"analyze_{source}")
+    automatic = on_recording and request and identity != st.session_state.get("last_mic_submission")
+    if not (submitted or automatic):
         return
+    if on_recording:
+        st.session_state.last_mic_submission = identity
 
     st.session_state.pop(_COMPLETED, None)
     with st.status("Starting analysis", expanded=True) as status:

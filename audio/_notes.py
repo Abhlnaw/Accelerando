@@ -112,7 +112,15 @@ def _pitch_changed(pitch, voiced, start, frame):
     upcoming = pitch[future]
     difference = upcoming - np.median(recent)
     large_change = np.all(difference >= _PITCH_CHANGE) or np.all(difference <= -_PITCH_CHANGE)
-    return bool(large_change and np.ptp(upcoming) <= 0.5)
+    if large_change and np.ptp(upcoming) <= 0.5:
+        return True
+    # Sung and bowed transitions often slide into the next note. Allow the
+    # first two frames to settle when the remaining body forms a distinct pitch.
+    body = upcoming[2:]
+    center = np.median(body)
+    return bool(abs(center - np.median(recent)) >= 1.25
+                and np.max(np.abs(body - center)) <= .45
+                and abs(upcoming[0] - center) < abs(upcoming[0] - np.median(recent)))
 
 
 def _onset_frame(first, energy, audible):

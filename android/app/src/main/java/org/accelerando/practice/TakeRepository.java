@@ -11,9 +11,12 @@ final class TakeRepository {
     static boolean validKey(String key){return "history".equals(key)||"settings".equals(key)||"library".equals(key);}
     File find(String id){if(id==null||!id.matches("[a-f0-9-]{36}"))return null;File f=new File(directory,id+".wav");return f.isFile()?f:null;}
     synchronized String save(PitchEngine engine)throws IOException{
+        return save(engine,null);
+    }
+    synchronized String save(PitchEngine engine,byte[] original)throws IOException{
         if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("Not enough storage to save the recording.");
         String id=UUID.randomUUID().toString();File pending=new File(directory,id+".tmp"),destination=new File(directory,id+".wav");
-        try{engine.writeWav(pending);if(!pending.renameTo(destination))throw new IOException("Could not finish saving the recording.");}
+        try{if(original==null)engine.writeWav(pending);else try(FileOutputStream out=new FileOutputStream(pending)){out.write(original);}if(!pending.renameTo(destination))throw new IOException("Could not finish saving the recording.");}
         finally{if(pending.exists())pending.delete();}
         File[] files=directory.listFiles((dir,name)->name.matches("[a-f0-9-]{36}\\.wav"));
         if(files!=null){Arrays.sort(files,Comparator.comparingLong(File::lastModified).reversed());for(int i=20;i<files.length;i++)files[i].delete();}

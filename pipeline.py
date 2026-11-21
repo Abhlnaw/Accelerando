@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parent
 MAX_AUDIO_BYTES = 25 * 1024 * 1024
 MAX_SCORE_BYTES = 5 * 1024 * 1024
 MAX_DURATION_S = 45
-ANALYSIS_VERSION = "integration-v1"
+ANALYSIS_VERSION = "recording-assessment-v2"
 
 
 class IntegrationError(RuntimeError):
@@ -61,11 +61,10 @@ class Analysis:
     score: list[ScoreNote]
     timings_s: dict[str, float]
     references: list[ReferenceSpec] = field(default_factory=list)
+    score_line: str = ""
 
 
 def validate_request(request: Request) -> float:
-    if Path(request.audio_name).suffix.lower() != ".wav":
-        raise InputError("Upload a WAV recording of one unaccompanied melody.")
     if Path(request.score_name).suffix.lower() not in {".xml", ".musicxml"}:
         raise InputError("Upload an uncompressed MusicXML (.musicxml or .xml) score.")
     if not request.score_bytes or len(request.score_bytes) > MAX_SCORE_BYTES:
@@ -172,13 +171,13 @@ def run_analysis(request: Request, progress: Callable[[str], None] = lambda _: N
         score_path.write_bytes(request.score_bytes)
         audio_path.write_bytes(request.audio_bytes)
         progress("Reading score")
-        parser = _domain("score", "parse_score")
+        parser = _domain("score", "read_lines")
         try:
-            score = _cached(_score_cache, (sha256(request.score_bytes).hexdigest(), _version("score")),
+            lines = _cached(_score_cache, (sha256(request.score_bytes).hexdigest(), _version("score")),
                             lambda: parser(score_path))
         except ValueError as exc:
             raise InputError(f"Score: {exc}") from exc
-        if not score:
+        if not lines:
             raise InputError("The score contains no sounding notes. Choose a single melodic part.")
         timings["score"] = perf_counter() - start
         progress("Extracting notes (first run may load the pitch model)")
@@ -191,12 +190,16 @@ def run_analysis(request: Request, progress: Callable[[str], None] = lambda _: N
         timings["take_extraction"] = perf_counter() - tick
         if take.duration_s is None:
             take.duration_s = duration
-        if not take.events:
+        from score import select_line
+        line, ambiguous = select_line(lines, take.events)
+        score = line.notes
+        if not take.events or ambiguous:
             result = Result("insufficient_evidence", None,
-                            warnings=list(dict.fromkeys(take.warnings + ["NO_RELIABLE_NOTES"])),
+                            warnings=list(dict.fromkeys(take.warnings + [
+                                "AMBIGUOUS_SCORE_LINE" if take.events else "NO_RELIABLE_NOTES"])),
                             assessed_fraction=0.0)
             timings["total"] = perf_counter() - start
-            return Analysis(result, take, score, timings)
+            return Analysis(result, take, score if len(lines) == 1 else [], timings)
         progress("Preparing optional references")
         references, used, warnings = [], [], []
         tick = perf_counter()
@@ -237,4 +240,4 @@ def run_analysis(request: Request, progress: Callable[[str], None] = lambda _: N
             result.warnings.append("SCORE_ONLY")
         timings["grading"] = perf_counter() - tick
         timings["total"] = perf_counter() - start
-        return Analysis(result, take, score, timings, used)
+        return Analysis(result, take, score, timings, used, line.label)
