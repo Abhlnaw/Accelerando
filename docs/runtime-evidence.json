@@ -1,0 +1,20 @@
+{
+  "method": "CREPE tiny (torchcrepe 0.0.24)",
+  "cold_timings_s": {
+    "score": 0.016372000000046683,
+    "take_extraction": 3.0982149000010395,
+    "references": 0.5215726000005816,
+    "grading": 0.013463100000080885,
+    "total": 4.6227429999999
+  },
+  "warm_timings_s": {
+    "score": 0.0032797000003483845,
+    "take_extraction": 0.5353402000000642,
+    "references": 0.00788000000102329,
+    "grading": 0.0009707999997772276,
+    "total": 0.5474852000006649
+  },
+  "cold_grade": 100.0,
+  "warm_grade": 100.0,
+  "network": "socket connections blocked"
+}
