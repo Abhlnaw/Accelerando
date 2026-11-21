@@ -4,11 +4,12 @@
 <title>Accelerando · Your practice studio</title><link rel="stylesheet" href="style.css"></head>
 <body>
 <aside class="sidebar"><div class="brand"><div>Accelerando<small>PRACTICE STUDIO</small></div></div>
-<nav aria-label="Main"><button class="nav active" aria-current="page" data-page="practice">Practice</button><button class="nav" data-page="library">Music library</button><button class="nav" data-page="progress">Your progress</button></nav>
+<nav aria-label="Main"><button class="nav active" aria-current="page" data-page="practice">Practice</button><button class="nav" data-page="tools">Practice tools</button><button class="nav" data-page="library">Music library</button><button class="nav" data-page="progress">Your progress</button></nav>
 <div class="sidebar-bottom">Analysis stays on this tablet.</div></aside>
 <main>
 <header><div><span class="eyebrow" id="page-eyebrow">ON-DEVICE PRACTICE</span><h1 id="page-heading">Practice studio</h1></div></header>
 <div id="notice" role="status" aria-live="polite" hidden></div>
+<section id="tools-page" class="page" hidden></section>
 <section id="practice-page" class="page">
 <div class="piece-heading"><div><span class="eyebrow">ON YOUR MUSIC STAND</span><h2 id="piece-title">Twinkle, Twinkle, Little Star</h2><p id="piece-meta">Traditional melody · Ready when you are</p></div><button id="change-piece" class="secondary">Change piece</button></div>
 <div class="settings"><label>Instrument<select id="instrument"></select></label><label>Practice mode<select id="mode"><option value="expressive">Follow my phrasing</option><option value="guided">Target tempo</option></select></label><label class="tempo-label">Target BPM<input id="target" type="number" min="30" max="240" value="80"></label><label>Written → sounding pitch<select id="transpose"><option value="score">Score / instrument default</option><option value="concert">Already in concert pitch</option><option value="-12">Sounds one octave lower</option><option value="-2">B♭ instrument (−2)</option><option value="-9">E♭ instrument (−9)</option><option value="0">No transposition</option></select></label></div>

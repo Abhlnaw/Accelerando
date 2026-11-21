@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Practice tools · Accelerando</title><link rel="stylesheet" href="tools.css"></head>
+<body><main>
+<nav aria-label="Choose a practice tool">
+<button data-tool="tuner" aria-pressed="true">Tuner</button>
+<button data-tool="metronome" aria-pressed="false">Metronome</button>
+<button data-tool="drone" aria-pressed="false">Drone</button>
+</nav>
+<section id="tuner">
+<div class="face"><div class="caption">Chromatic tuner</div><output class="readout" id="note">—</output>
+<div class="meter" aria-hidden="true"><i id="needle" hidden></i></div><div class="scale"><span>♭ Flat</span><span>In tune</span><span>Sharp ♯</span></div>
+<p id="intonation">Play one sustained note.</p></div>
+<div class="controls"><label>Tuning preset<select id="preset"></select></label><label>Target<select id="target"></select></label>
+<label>Concert A (Hz)<input id="reference" type="number" min="400" max="480" value="440"></label>
+<label>Note names<select id="spelling"><option value="sharp">Sharps ♯</option><option value="flat">Flats ♭</option></select></label></div>
+<button class="primary" id="listen">Start tuner</button>
+</section>
+<section id="metronome" hidden>
+<div class="face"><div class="caption">Metronome</div><output class="readout" id="tempoDisplay">96</output><div class="unit">beats per minute</div><div id="lights" aria-label="Beat indicator"></div></div>
+<label class="tempo-slider">Tempo adjustment<input aria-label="Tempo slider" id="tempoSlider" type="range" min="20" max="300" value="96"></label>
+<div class="controls"><label>Tempo (BPM)<input id="tempo" type="number" min="20" max="300" value="96"></label>
+<div class="stepper"><button id="slower" aria-label="One BPM slower">−</button><button id="faster" aria-label="One BPM faster">+</button><button id="tap">Tap tempo</button></div>
+<label>Beats per bar<select id="beats"></select></label>
+<label>Clicks per beat<select id="division"><option value="1">1 · Beat</option><option value="2">2 · Eighths</option><option value="3">3 · Triplets</option><option value="4">4 · Sixteenths</option></select></label>
+<label>Downbeat<select id="accent"><option value="on">Accented</option><option value="off">Even clicks</option></select></label>
+<label>Click sound<select id="clickTone"><option value="sine">Round click</option><option value="triangle">Woodblock</option><option value="square">Electronic</option></select></label>
+<label>Click volume<input id="clickVolume" type="range" min="0" max="100" value="65"></label></div>
+<button class="primary" id="click">Start metronome</button>
+</section>
+<section id="drone" hidden>
+<div class="face"><div class="caption">Reference drone</div><output class="readout" id="droneDisplay">A3</output><p id="droneFrequency">220.0 Hz</p></div>
+<div class="controls"><label>Root note<select id="root"></select></label><label>Octave<select id="octave"></select></label>
+<label>Tone<select id="wave"><option value="sine">Pure sine</option><option value="triangle">Soft triangle</option><option value="sawtooth">Bright reed</option></select></label>
+<label>Harmony<select id="harmony"><option value="0">Root alone</option><option value="7">Root + fifth</option><option value="12">Root + octave</option><option value="4">Root + major third</option><option value="3">Root + minor third</option></select></label>
+<label>Concert A (Hz)<input id="droneReference" min="400" max="480" type="number" value="440"></label>
+<label>Drone volume<input id="droneVolume" type="range" min="0" max="100" value="35"></label></div>
+<button class="primary" id="sustain">Start drone</button>
+</section>
+<footer><span role="status" id="status">Ready</span><button id="silence" disabled>Stop all</button></footer>
+</main><script src="pitch.js"></script><script src="tools.js"></script></body></html>

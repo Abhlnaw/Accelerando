@@ -8,6 +8,12 @@ local microphone capture, neural pitch inference, live notation following and
 practice history. See its README for APK installation and Tab S7 FE testing.
 The Streamlit workflow below supports browser microphone recording and WAV uploads.
 
+Open **Practice tools** in either app for a live chromatic tuner, tap-tempo
+metronome, and sustained reference drone. The tuner and drone share the concert
+A calibration. The metronome and drone can play together. Use **Stop all** or
+leave the page to end the session. Browser microphone access requires HTTPS or
+localhost and microphone permission.
+
 All four work packages are integrated: MusicXML parsing, local pretrained CREPE
 pitch inference, interpretation-aware grading, and the Streamlit app. The bundled
 melodies and comparison takes are labeled synthetic. A permitted recorded flute

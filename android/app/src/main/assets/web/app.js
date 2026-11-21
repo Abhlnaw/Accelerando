@@ -19,6 +19,19 @@ function twinkle(instrument){
 }
 function notice(message){$('notice').hidden=!message;$('notice').textContent=message;}
 function setPage(page){
+  const host=$('tools-page'), frame=host.querySelector('iframe');
+  if(page==='tools' && phase!=='idle'){notice('Finish the current take before opening practice tools.');return;}
+  if(page==='tools' && !frame){
+    window.Android?.stopReplay?.();
+    const tools=document.createElement('iframe');
+    tools.title='Tuner, metronome and drone';
+    tools.allow='microphone; autoplay';
+    tools.src='tools/index.html';
+    host.append(tools);
+  } else if(page!=='tools' && frame){
+    frame.contentWindow.stopPracticeTools?.();
+    frame.remove();
+  }
   document.querySelectorAll('.page').forEach(p=>p.hidden=p.id!==page+'-page');
   document.querySelectorAll('.nav').forEach(button => {
     const active = button.dataset.page === page;
@@ -26,7 +39,7 @@ function setPage(page){
     if (active) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
-  $('page-heading').textContent={practice:'Practice studio',library:'Music library',progress:'Your progress'}[page];
+  $('page-heading').textContent={practice:'Practice studio',tools:'Practice tools',library:'Music library',progress:'Your progress'}[page];
   if(page==='practice')setTimeout(renderScore,30);if(page==='progress')renderProgress();
 }
 function activeScore(){if(!selection)return score;return {...score,notes:score.notes.filter(n=>n.onset>=selection.onset&&n.onset<selection.end),measures:score.measures.filter(b=>b.onset>=selection.onset&&b.onset<selection.end)};}
@@ -93,6 +106,7 @@ function markNotes(result){
   }
 }
 function setPhase(next){phase=next;const busy=next!=='idle';$('start').hidden=busy;$('stop').hidden=!busy;$('stop').disabled=next==='loading';
+  if(busy && !$('tools-page').hidden) setPage('practice');
   ['instrument','mode','target','transpose','change-piece','audio-upload','score-upload','part','twinkle','whole-piece','reference-upload'].forEach(id=>$(id).disabled=busy);
   $('listening-orb').classList.toggle('listening',next==='recording');
 }

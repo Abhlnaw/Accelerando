@@ -61,7 +61,7 @@
 }
 
 [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
-  padding: 0.4rem 1.15rem 1.5rem;
+  padding: 0.4rem 0.85rem 1.5rem;
 }
 
 [data-testid="stSidebarUserContent"] > [data-testid="stVerticalBlock"] {
