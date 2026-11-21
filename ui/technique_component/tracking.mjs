@@ -9,14 +9,19 @@ export const fingerNames = ["Index", "Middle", "Ring", "Little"];
 const deg = (r) => (r * 180) / Math.PI;
 export const delta = (a, b) => Math.abs(((a - b + 540) % 360) - 180);
 const finite = Number.isFinite;
-export function visible(p) {
+export function visible(p, threshold = 0.7) {
   return (
-    p && p.visibility >= 0.7 && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1
+    p &&
+    p.visibility >= threshold &&
+    p.x >= 0 &&
+    p.x <= 1 &&
+    p.y >= 0 &&
+    p.y <= 1
   );
 }
 export function posture(points, w, h) {
   const p = (i) =>
-    visible(points?.[i]) ? [points[i].x * w, points[i].y * h] : null;
+    visible(points?.[i], 0.65) ? [points[i].x * w, points[i].y * h] : null;
   const line = (a, b) =>
     !a || !b || Math.hypot(b[0] - a[0], b[1] - a[1]) < w * 0.025
       ? null
@@ -100,7 +105,7 @@ const error = (a, b, i) =>
 export function calibrate(rows, n) {
   return Array.from({ length: n }, (_, i) => {
     const vals = rows.map((row) => row?.[i]).filter(finite);
-    if (vals.length < 8) return null;
+    if (vals.length < (i < bodyNames.length ? 6 : 8)) return null;
     const cost = (v) => vals.reduce((s, x) => s + error(x, v, i), 0);
     const center = vals.reduce((a, b) => (cost(a) <= cost(b) ? a : b));
     return vals.filter((v) => error(v, center, i) <= (i < 5 ? 6 : 0)).length >=
@@ -109,9 +114,19 @@ export function calibrate(rows, n) {
       : null;
   });
 }
+// Prototype limits in degrees: full credit, then zero credit. Elbows have
+// more freedom during playing than the shoulder line or trunk.
+const angleBands = [
+  [1, 14],
+  [2, 18],
+  [1, 12],
+  [3, 20],
+  [3, 20],
+];
 export function assess(slots, a, b = null) {
   return a.map((target, i) => {
-    if (!finite(target) || (b && !finite(b[i]))) return null;
+    if (!finite(target) || (b && !finite(b[i])))
+      return { score: null, note: "No stable reference" };
     const groups = b
       ? [0, 1, 2, 3].map((k) => [
           slots.slice(10 * k + 4, 10 * k + 10),
@@ -121,25 +136,44 @@ export function assess(slots, a, b = null) {
     const credits = [];
     for (const [group, t] of groups) {
       const vals = group.map((row) => row?.[i]).filter(finite);
-      if (vals.length < (b ? 4 : 28)) return null;
+      const body = i < bodyNames.length;
+      const needed = body ? (b ? 3 : 16) : b ? 4 : 28;
+      const note = b
+        ? "Cue " + (credits.length + 1) + ": " + vals.length + "/6 visible"
+        : vals.length + "/40 visible";
+      if (vals.length < needed) return { score: null, note };
+      if (body && !b) {
+        const periods = [0, 10, 20, 30].filter(
+          (start) =>
+            group.slice(start, start + 10).filter((row) => finite(row?.[i]))
+              .length >= 3,
+        );
+        if (periods.length < 3)
+          return { score: null, note: "Visible too briefly · " + note };
+      }
+      if (!body) {
+        credits.push(vals.filter((x) => x === t).length / vals.length);
+        continue;
+      }
+      const [full, zero] = angleBands[i];
+      const values = vals
+        .map((x) =>
+          Math.min(1, Math.max(0, (zero - delta(x, t)) / (zero - full))),
+        )
+        .sort((x, y) => x - y);
+      const mean = (list) => list.reduce((sum, x) => sum + x, 0) / list.length;
       credits.push(
-        vals.reduce((s, x) => {
-          const d = error(x, t, i);
-          return (
-            s +
-            (i >= 5
-              ? Number(d === 0)
-              : b
-                ? Number(
-                    d <= Math.min(10, Math.max(5, delta(target, b[i]) / 3)),
-                  )
-                : Math.max(0, Math.min(1, (25 - d) / 20)))
-          );
-        }, 0) / vals.length,
+        0.75 * mean(values) +
+          0.25 * mean(values.slice(0, Math.ceil(values.length / 4))),
       );
     }
-    return Math.round(
+    const score = Math.round(
       (100 * credits.reduce((s, v) => s + v, 0)) / credits.length,
     );
+    const visibleCount = groups.reduce(
+      (n, [group]) => n + group.filter((row) => finite(row?.[i])).length,
+      0,
+    );
+    return { score, note: visibleCount + "/" + (b ? 24 : 40) + " visible" };
   });
 }

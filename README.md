@@ -4,7 +4,7 @@ In the Streamlit studio, open **Webcam technique** to practice a visible
 position while singing or playing. Choose a mode and camera-facing setup,
 enable the webcam on localhost or HTTPS, and start the check. **Hold a
 position** compares ten seconds of practice against a three-second reference.
-The preview digitally centers the musician and shows head, shoulders, torso,
+The fixed, mirrored preview shows head, shoulders, torso,
 and both elbows together. For guitar, bass or bowed strings, select the
 string count and tap four points on the two outer strings. Keep the instrument
 aligned to this grid. The camera compares each visible left fingertip's

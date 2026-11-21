@@ -1,7 +1,7 @@
 ﻿import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  assess,
+  assess as assessParts,
   calibrate,
   leftHand,
   posture,
@@ -10,6 +10,7 @@ import {
 } from "../ui/technique_component/tracking.mjs";
 
 const point = (x, y) => ({ x, y, visibility: 1 });
+const assess = (...args) => assessParts(...args).map((part) => part.score);
 const repeat = (v, n) => Array.from({ length: n }, () => [...v]);
 
 test("four tips resolve to independently mapped strings, with ambiguity withheld", () => {
@@ -61,9 +62,20 @@ test("grades compare each visible angle and each calibrated finger separately", 
   assert.deepEqual(calibrate(repeat(a, 9), 9), a);
   assert.deepEqual(
     assess(repeat([0, 25, 15, 90, null, 2, 2, null, 4], 40), a),
-    [100, 0, 50, 100, null, 0, 100, null, 100],
+    [100, 0, 0, 100, null, 0, 100, null, 100],
   );
-  assert.ok(assess(repeat(a, 27), a).every((v) => v === null));
+  assert.ok(assess(repeat(a, 12), a).every((v) => v === null));
+});
+test("moderate drift is graded by joint; intermittent visibility must span the take", () => {
+  const ref = [0, 0, 0, 90, 90];
+  const rows = repeat([8, 8, 8, 98, 98], 40);
+  const scores = assess(rows, ref);
+  assert.deepEqual(scores, [46, 63, 36, 71, 71]);
+  const partial = rows.map((row, i) => (i % 2 === 0 ? row : []));
+  assert.deepEqual(assess(partial, ref), scores);
+  assert.ok(assess(rows.slice(0, 16), ref).every((v) => v === null));
+  const drifting = repeat(ref, 30).concat(rows.slice(30));
+  assert.ok(assess(drifting, ref)[0] < 85);
 });
 test("a finger changing strings can define a gesture and every cue requires evidence", () => {
   const a = [0, 0, 0, 90, 90, 1],

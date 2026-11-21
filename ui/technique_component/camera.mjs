@@ -1,4 +1,4 @@
-﻿import {
+import {
   bodyNames,
   fingerNames,
   visible,
@@ -41,8 +41,7 @@ let phase = "off",
   rows = [],
   a,
   b,
-  board = [],
-  crop = { x: 0, y: 0, z: 1 };
+  board = [];
 const marks = [
   "Tap string 1 near the nut",
   "Tap string 1 toward the bridge",
@@ -132,43 +131,6 @@ function draw(points, hand, lines) {
     canvas.width = w;
     canvas.height = h;
   }
-  // Infer on the full sensor frame; only the displayed crop follows the musician.
-  const visiblePoints = [
-    ...(points ?? []).filter(
-      (p, i) =>
-        [0, 7, 8, 11, 12, 13, 14, 15, 16, 23, 24].includes(i) && visible(p),
-    ),
-    ...(hand ?? []),
-    ...board,
-  ];
-  let z = 1,
-    x = 0,
-    y = 0;
-  if (points && visiblePoints.length && !(stringMode() && board.length < 4)) {
-    const xs = visiblePoints.map((p) => p.x),
-      ys = visiblePoints.map((p) => p.y);
-    const lo = Math.min(...xs),
-      hi = Math.max(...xs),
-      top = Math.min(...ys),
-      bottom = Math.max(...ys);
-    z = Math.max(
-      1,
-      Math.min(1.65, 1 / (hi - lo + 0.18), 1 / (bottom - top + 0.18)),
-    );
-    const edge = 1 - 1 / z;
-    x = Math.max(0, Math.min(edge, (lo + hi) / 2 - 0.5 / z));
-    y = Math.max(0, Math.min(edge, (top + bottom) / 2 - 0.5 / z));
-  }
-  for (const [key, value] of Object.entries({ x, y, z }))
-    crop[key] += (value - crop[key]) * 0.24;
-  ctx.setTransform(
-    crop.z,
-    0,
-    0,
-    crop.z,
-    -crop.x * w * crop.z,
-    -crop.y * h * crop.z,
-  );
   ctx.drawImage(video, 0, 0, w, h);
   const line = (p, q, color) => {
     ctx.strokeStyle = color;
@@ -189,9 +151,9 @@ function draw(points, hand, lines) {
     [12, 24],
     [23, 24],
   ])
-    if (visible(points?.[i]) && visible(points?.[j]))
-      line(points[i], points[j], "#64f4be");
-  for (const [p, q] of lines) line(p, q, "#ffdb69");
+    if (visible(points?.[i], 0.65) && visible(points?.[j], 0.65))
+      line(points[i], points[j], "#f6d4a6");
+  for (const [p, q] of lines) line(p, q, "#ffd682");
   for (const p of [
     ...board,
     ...(hand ? [8, 12, 16, 20].map((i) => hand[i]) : []),
@@ -206,8 +168,8 @@ canvas.onclick = (e) => {
   if (phase !== "preview" || !stringMode() || board.length >= 4) return;
   const r = canvas.getBoundingClientRect();
   board.push({
-    x: crop.x + (1 - (e.clientX - r.left) / r.width) / crop.z,
-    y: crop.y + (e.clientY - r.top) / r.height / crop.z,
+    x: 1 - (e.clientX - r.left) / r.width,
+    y: (e.clientY - r.top) / r.height,
   });
   if (board.length === 4) {
     const [p, q, r, s] = board;
@@ -239,7 +201,8 @@ el("remap").onclick = () => {
   el("result").textContent = "";
 };
 function finish() {
-  const scores = assess(rows, a, b);
+  const details = assess(rows, a, b);
+  const scores = details.map((part) => part.score);
   const practiceCues = [
     "Watch the line between your shoulders as you repeat the phrase.",
     "Use the ear markers to return to your chosen head angle.",
@@ -258,7 +221,9 @@ function finish() {
   close("Check complete");
   cards(
     scores.map((s, i) =>
-      s === null ? "Too little evidence" : s + "/100" + bestTargets[i],
+      s === null
+        ? details[i].note
+        : s + "/100" + bestTargets[i] + " · " + details[i].note,
     ),
   );
   const weakest = scores
@@ -417,7 +382,7 @@ el("start").onclick = async () => {
   const current = ++token;
   phase = "opening";
   layout();
-  crop = { x: 0, y: 0, z: 1 };
+
   el("start").hidden =
     profile.disabled =
     exercise.disabled =
