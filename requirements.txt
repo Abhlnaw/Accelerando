@@ -1,0 +1,5 @@
+# Single environment list. Audio/model versions must be finalized with Agent 1.
+streamlit==1.51.0
+pytest==8.4.2
+# The orchestration and contracts use only Python's standard library.
+# Add domain dependencies here when their owner branches are integrated.
