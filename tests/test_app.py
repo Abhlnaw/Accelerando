@@ -1,47 +1,69 @@
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
-from types import SimpleNamespace
 
 from streamlit.testing.v1 import AppTest
+
 from contracts import Result, Take
-from pipeline import Analysis, IntegrationError, load_catalog
+from pipeline import Analysis, IntegrationError
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def open_app(page: str | None = None, timeout: int = 30):
+    app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=timeout)
+    if page:
+        app.switch_page(f"ui/{page}.py")
+    return app.run()
+
+
 class AppTests(unittest.TestCase):
+    def test_studio_and_empty_results(self):
+        app = open_app()
+        self.assertFalse(app.exception)
+        self.assertIn("Start a practice take", [item.label for item in app.button])
+        app.switch_page("ui/results.py").run()
+        self.assertFalse(app.exception)
+        self.assertIn("Analyze a take to get feedback", [item.value for item in app.subheader])
+
     def test_real_example_displays_measure_two_and_reference(self):
-        app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=60).run()
-        app.radio[0].set_value("Try an example").run()
-        app.selectbox[1].set_value(load_catalog()[0]["takes"][2]).run()
-        app.button[0].click().run()
+        app = open_app("examples", timeout=60)
+        app.radio[0].set_value(2).run()
+        app.button(key="analyze_examples").click().run()
         self.assertFalse(app.exception)
         self.assertFalse(app.error)
-        self.assertEqual(app.metric[0].value, "96.5 / 100")
-        self.assertTrue(any("Measure 2" in m.value for m in app.markdown))
-        completed = app.session_state["completed"]
-        self.assertTrue(completed[1].result.reference_observations)
+        self.assertTrue(any("Measure 2" in h.value for h in app.subheader))
+        self.assertEqual([tab.label for tab in app.tabs], ["Feedback", "Written score", "References", "Diagnostics"])
+        take = app.session_state["completed_analysis"]
+        self.assertAlmostEqual(take.analysis.result.grade, 96.5, places=1)
+        self.assertTrue(take.analysis.result.reference_observations)
+        app.switch_page("ui/guide.py").run()
+        app.switch_page("ui/results.py").run()
+        self.assertIn("Measure 2", [item.value for item in app.subheader])
 
     def test_changed_upload_clears_grade_and_reruns_do_not_analyze(self):
         audio = SimpleNamespace(name="same.wav", getvalue=lambda: b"first recording")
         score = SimpleNamespace(name="score.musicxml", getvalue=lambda: b"score")
         analysis = Analysis(Result("ok", 91), Take("test"), [], {})
+
         def upload(label, **kwargs):
             return audio if label == "Your performance" else score
+
         with patch("streamlit.file_uploader", side_effect=upload), \
              patch("pipeline.run_analysis", return_value=analysis) as run:
-            app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20).run()
+            app = open_app("practice")
             run.assert_not_called()
-            app.button[0].click().run()
+            app.button(key="analyze_practice").click().run()
             self.assertFalse(app.exception)
             self.assertEqual(run.call_count, 1)
-            self.assertEqual(app.metric[0].value, "91.0 / 100")
-            app.run()
+            self.assertEqual(app.session_state["completed_analysis"].analysis.result.grade, 91)
+            app.switch_page("ui/results.py").run()
             self.assertEqual(run.call_count, 1)
             audio.getvalue = lambda: b"second recording with identical filename"
-            app.run()
-            self.assertEqual(len(app.metric), 0)
+            app.switch_page("ui/practice.py").run()
+            self.assertNotIn("completed_analysis", app.session_state)
             self.assertEqual(run.call_count, 1)
 
     def test_missing_owner_reports_error_without_grade(self):
@@ -50,29 +72,24 @@ class AppTests(unittest.TestCase):
         with patch("streamlit.file_uploader", side_effect=lambda label, **kwargs:
                    audio if label == "Your performance" else score), \
              patch("pipeline.run_analysis", side_effect=IntegrationError("audio.extract is unavailable")):
-            app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20).run()
-            app.button[0].click().run()
+            app = open_app("practice")
+            app.button(key="analyze_practice").click().run()
             self.assertFalse(app.exception)
             self.assertIn("audio.extract", app.error[0].value)
-            self.assertEqual(len(app.metric), 0)
+            self.assertNotIn("completed_analysis", app.session_state)
 
-    def test_start_preview_and_switch_back_clear_result(self):
-        app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20).run()
+    def test_development_preview_is_separate_from_results(self):
+        app = open_app("guide")
         self.assertFalse(app.exception)
-        self.assertTrue(app.button[0].disabled)
-        app.radio[0].set_value("Development preview").run()
+        app.checkbox[0].check().run()
         self.assertFalse(app.exception)
-        self.assertTrue(any("DEVELOPMENT FIXTURE" in w.value for w in app.warning))
-        self.assertEqual(app.metric[0].value, "88.0 / 100")
-        app.radio[0].set_value("Upload my performance").run()
-        self.assertFalse(app.exception)
-        self.assertEqual(len(app.metric), 0)
-        self.assertTrue(app.button[0].disabled)
+        self.assertTrue(any("Development fixture" in w.value for w in app.warning))
+        self.assertNotIn("completed_analysis", app.session_state)
+        self.assertIn("Feedback", [tab.label for tab in app.tabs])
 
     def test_example_catalog_absent_is_actionable(self):
         with patch("pipeline.load_catalog", return_value=[]):
-            app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20).run()
-            app.radio[0].set_value("Try an example").run()
-        self.assertFalse(app.exception)
-        self.assertTrue(app.info)
-        self.assertTrue(app.button[0].disabled)
+            app = open_app("examples")
+            self.assertFalse(app.exception)
+            self.assertTrue(app.info)
+            self.assertFalse(app.button)

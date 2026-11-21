@@ -19,8 +19,13 @@ function twinkle(instrument){
 function notice(message){$('notice').hidden=!message;$('notice').textContent=message;}
 function setPage(page){
   document.querySelectorAll('.page').forEach(p=>p.hidden=p.id!==page+'-page');
-  document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.page===page));
-  $('page-heading').textContent={practice:'Make the next note count.',library:'Music you want to come back to.',progress:'Every take tells a story.'}[page];
+  document.querySelectorAll('.nav').forEach(button => {
+    const active = button.dataset.page === page;
+    button.classList.toggle('active', active);
+    if (active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+  $('page-heading').textContent={practice:'Practice studio',library:'Music library',progress:'Your progress'}[page];
   if(page==='practice')setTimeout(renderScore,30);if(page==='progress')renderProgress();
 }
 function activeScore(){if(!selection)return score;return {...score,notes:score.notes.filter(n=>n.onset>=selection.onset&&n.onset<selection.end),measures:score.measures.filter(b=>b.onset>=selection.onset&&b.onset<selection.end)};}
@@ -140,6 +145,11 @@ function renderProgress(){
 document.querySelectorAll('.nav').forEach(n=>n.onclick=()=>setPage(n.dataset.page));
 for(const [id,p]of Object.entries(Coach.profiles))$('instrument').add(new Option(p.name,id));
 $('instrument').value=localStorage.getItem('accelerando-instrument')||'guitar';
+function updateTempoControl() {
+  $('target').closest('label').hidden = $('mode').value !== 'guided';
+}
+$('mode').addEventListener('change', updateTempoControl);
+updateTempoControl();
 $('instrument').onchange=()=>{localStorage.setItem('accelerando-instrument',$('instrument').value);changeScore(builtin?twinkle($('instrument').value):xml);};
 $('transpose').onchange=()=>changeScore(xml);
 $('part').onchange=()=>{partIndex=Number($('part').value);changeScore(xml);};
