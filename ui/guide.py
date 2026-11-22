@@ -21,7 +21,7 @@ def guide():
     with st.container(border=True, key="guide_weights"):
         st.subheader("What the grade measures", anchor=False)
         st.markdown(
-            "- **Pitch accuracy, 50%.** How close the played pitches were to the written ones.\n"
+            "The overall grade is 10 times the square root of the weighted score. For example, 64 becomes 80.\n\n- **Pitch accuracy, 50%.** How close the played pitches were to the written ones.\n"
             "- **Note coverage, 30%.** How much of the score was played, accounting for extra and missed notes.\n"
             "- **Local rhythm, 20%.** How closely note attacks follow nearby beats in your take."
         )

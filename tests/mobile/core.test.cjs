@@ -127,6 +127,7 @@ test('live run uses the same weighted assessment while withholding a premature f
  const live=C.assess(s,events,{partial:true}),final=C.assess(s,events);
  assert.equal(live.grade,null);
  assert.equal(live.provisionalGrade,final.grade);
+ assert.ok(Math.abs(final.grade-10*Math.sqrt(.5*final.pitch+.3*final.coverage+.2*final.rhythm))<1e-8);
  assert.ok(final.grade<100 && final.grade>0);
  assert.ok(live.findings.some(f=>f.kind==='pitch'));
 });

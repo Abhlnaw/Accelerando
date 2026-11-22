@@ -204,8 +204,9 @@
     const weighted=available.length?available.reduce((s,[v,w])=>s+v*w,0)/available.reduce((s,[,w])=>s+w,0):null;
     const recognizable=partial?anchors.length>=Math.min(3,score.notes.length)&&anchors.length>=matches.length/2:sufficient;
     if(!recognizable)for(const id of Object.keys(colors))if(colors[id]!=='correct')delete colors[id];
-    const grade=!partial&&sufficient?weighted:null;
-    const provisionalGrade=recognizable?weighted:null;
+    const curved=weighted===null?null:10*Math.sqrt(weighted);
+    const grade=!partial&&sufficient?curved:null;
+    const provisionalGrade=recognizable?curved:null;
     const current=matches.at(-1)?.note.id||score.notes[0]?.id;
     let passage=null;
     if(!partial && !excerpt && grade===null && events.length>=4 && events.length<score.notes.length){

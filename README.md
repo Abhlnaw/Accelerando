@@ -1,5 +1,9 @@
 # Accelerando
 
+[Download the Android v0.8.4 APK](https://github.com/Abhlnaw/Accelerando/releases/download/v0.8.4/accelerando-v0.8.4-debug.apk). Open it on your tablet to install or update.
+
+New sheet-music practice grades use `10 * sqrt(weighted_score)` after combining the available subscores on a 0-100 scale. A raw 64 becomes 80, 81 becomes 90, and 100 stays 100. Pitch, coverage, rhythm and tempo retain their measured values. Takes with insufficient evidence remain ungraded. Previously saved reports retain their original grades.
+
 In the Streamlit studio, open **Webcam technique** to practice a visible
 position while singing or playing. Choose a mode and camera-facing setup,
 enable the webcam on localhost or HTTPS, and start the check. **Hold a

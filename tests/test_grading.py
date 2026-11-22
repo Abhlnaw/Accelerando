@@ -77,7 +77,7 @@ class GradingTests(TestCase):
         self.assertEqual(report.alignment[-1].score_note_id, self.score[-1].id)
         self.assertEqual(report.alignment[-1].observed_index, len(wrong.events) - 1)
         self.assertAlmostEqual(report.result.subscores["pitch"], 100 * 11 / 12)
-        self.assertAlmostEqual(report.result.grade, 100 - 50 / 12)
+        self.assertAlmostEqual(report.result.grade, 10 * (100 - 50 / 12) ** 0.5)
 
     def test_missing_note_uses_anchor_and_alignment_recovers(self):
         take = make_take(self.score)
@@ -208,7 +208,7 @@ class GradingTests(TestCase):
 
         self.assertAlmostEqual(result.subscores["pitch"], 80)
         self.assertIsNone(result.subscores["rhythm"])
-        self.assertAlmostEqual(result.grade, (0.5 * 80 + 0.3 * 100) / 0.8)
+        self.assertAlmostEqual(result.grade, 10 * ((0.5 * 80 + 0.3 * 100) / 0.8) ** 0.5)
 
     def test_moderate_detuning_remains_recognizable(self):
         result = analyze(self.score, make_take(self.score, cents=55))

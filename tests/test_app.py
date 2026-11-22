@@ -52,7 +52,7 @@ class AppTests(unittest.TestCase):
         self.assertTrue(any("Measure 2" in h.value for h in app.subheader))
         self.assertEqual([tab.label for tab in app.tabs], ["Feedback", "Written score", "References", "Diagnostics"])
         take = app.session_state["completed_analysis"]
-        self.assertAlmostEqual(take.analysis.result.grade, 96.5, places=1)
+        self.assertAlmostEqual(take.analysis.result.grade, 10 * 96.5 ** 0.5, places=1)
         self.assertTrue(take.analysis.result.reference_observations)
         app.switch_page("ui/guide.py").run()
         app.switch_page("ui/results.py").run()

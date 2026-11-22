@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from bisect import bisect_left
 from dataclasses import dataclass
+from math import sqrt
 from statistics import mean, median
 from typing import TYPE_CHECKING, Literal, Sequence
 
@@ -400,7 +401,7 @@ def analyze_with_evidence(
         available = [(score_value, weights[name]) for name, score_value in subscores.items() if score_value is not None]
         grade = sum(value * weight for value, weight in available) / sum(weight for _, weight in available)
         result = Result(
-            status="ok", grade=grade, subscores=subscores, warnings=list(dict.fromkeys(warnings)),
+            status="ok", grade=10 * sqrt(grade), subscores=subscores, warnings=list(dict.fromkeys(warnings)),
             reference_observations=_compare_references(score, evidence, references),
             findings=_rank(issues, score), assessed_fraction=assessed_fraction,
         )
