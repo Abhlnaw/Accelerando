@@ -123,7 +123,7 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void importFile(String kind){
             if(busy)return;importKind=kind;
             runOnUiThread(()->{Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.setType("*/*");intent.addCategory(Intent.CATEGORY_OPENABLE);
-                intent.putExtra(Intent.EXTRA_MIME_TYPES,kind.equals("score")?new String[]{"application/xml","text/xml","application/vnd.recordare.musicxml+xml","application/octet-stream","application/pdf"}:new String[]{"audio/*"});
+                intent.putExtra(Intent.EXTRA_MIME_TYPES,kind.equals("score")?new String[]{"application/xml","text/xml","application/vnd.recordare.musicxml+xml","application/octet-stream","application/pdf"}:new String[]{"audio/*","video/*"});
                 startActivityForResult(intent,42);});
         }
         @JavascriptInterface public void openSource(String url){openExternal(url);}
@@ -207,7 +207,7 @@ public final class MainActivity extends Activity {
                 if(kind.equals("score")){
                     if(new String(bytes,0,Math.min(bytes.length,4)).equals("%PDF")){error("import","This PDF is a page image. Export matching MusicXML for interactive notes. Automatic scan recognition is not included.");return;}
                     JSONObject p=new JSONObject();p.put("xml",new String(bytes,java.nio.charset.StandardCharsets.UTF_8));event("score",p);
-                }else runOnUiThread(()->begin(bytes));
+                }else {byte[] wav=MediaTake.wav(bytes);runOnUiThread(()->begin(wav));}
             }catch(Exception ex){error("import",ex.getMessage()==null?"Could not open this file.":ex.getMessage());}
         });
     }

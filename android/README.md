@@ -48,9 +48,7 @@ notes can receive a separate excerpt score when the full piece is unfinished.
   Ambiguous line matches remain ungraded.
   Imported scores and selected line/instrument settings persist across restarts.
   The library has a 4-million-character storage budget and rejects additions if full.
-- **Upload a take** runs on-device inference on an uncompressed PCM16 WAV, mono
-  or stereo, 8–96 kHz, at most 25 MB / 3 minutes. It uses the currently selected
-  score and passage.
+- **Upload audio or video** accepts PCM16 WAV, MP3, M4A and MP4 with an audio track, up to 25 MB and three minutes. Android decodes compressed recordings locally and uses the first audio track for grading and replay.
 - **Play reference audio** opens a local audio file using Android's media player.
   A reference is for listening; it does not change the assessment. Starting a
   microphone take stops reference playback.

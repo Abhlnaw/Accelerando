@@ -126,6 +126,11 @@ final class PitchEngine implements AutoCloseable {
             double confidence = best;
             if (!clipped && best < .65 && samples >= window.length) {
                 double measured = periodic.midi(window, lowMidi, highMidi);
+                // In noise, accept weaker periodicity only if CREPE independently agrees.
+                if (!Double.isFinite(measured) && best >= .30) {
+                    double candidate=periodic.midi(window,lowMidi,highMidi,.24);
+                    if(Math.abs(candidate-midi)<.45) measured=candidate;
+                }
                 if (Double.isFinite(measured)) {
                     midi = measured;
                     confidence = .70;

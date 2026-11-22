@@ -163,8 +163,8 @@
     const path=align(score.notes,events,partial);
     const matches=path.filter(p=>p.kind==='match'),anchors=matches.filter(p=>Math.abs(p.note.midi-p.event.midi)<=identityTolerance);
     const colors={},findings=[],residuals=[],rates=[];let missing=0,extra=0;
-    for(const p of matches){const cents=100*(p.event.midi-p.note.midi);colors[p.note.id]=Math.abs(cents)<=35?'correct':'pitch';
-      if(Math.abs(cents)>35)findings.push({kind:'pitch',id:p.note.id,measure:p.note.measure,time:p.event.onset,approximate:false,
+    for(const p of matches){const cents=100*(p.event.midi-p.note.midi);colors[p.note.id]=Math.abs(cents)<=45?'correct':'pitch';
+      if(Math.abs(cents)>45)findings.push({kind:'pitch',id:p.note.id,measure:p.note.measure,time:p.event.onset,approximate:false,
         message:`${pitchName(p.note.midi)}: about ${Math.round(Math.abs(cents))} cents ${cents>0?'sharp':'flat'}. Listen, find the target pitch, then play the entrance again.`});}
     for(let a=1;a<anchors.length;a++){const q=anchors[a].note.onset-anchors[a-1].note.onset,s=anchors[a].event.onset-anchors[a-1].event.onset;
       if(q>0&&q<=4&&s>0)rates.push(s/q);}
@@ -193,7 +193,7 @@
         message:`This entrance was ${Math.abs(residual).toFixed(2)} local beats ${residual>0?'late':'early'}. Tap the neighboring beats, then try the passage again.`});}
     }
     const fraction=score.notes.length?(matches.length+missing)/score.notes.length:0;
-    const pitch=mean(matches.map(p=>credit((p.event.midi-p.note.midi)*100,35,100)));
+    const pitch=mean(matches.map(p=>credit((p.event.midi-p.note.midi)*100,45,125)));
     const coverage=matches.length?100*matches.length/(matches.length+missing+extra):null;
     const rhythm=mean(residuals.map(r=>credit(r,.15,.5)));
     const tempo=bpm?credit((bpm-targetBpm)/targetBpm,.05,.25):null;

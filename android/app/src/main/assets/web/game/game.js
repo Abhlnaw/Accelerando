@@ -2,6 +2,19 @@
 const $=id=>document.getElementById(id);
 let pieces=[], lines=[], selected, run=null, replayUrl, ticket=0, historyVersion=0;
 let cursor=0, camera=0, colors={}, heard='', pulse=0;
+let pending=null;
+function review(r,result,recordingId){
+  pending={line:r.key,time:Date.now(),grade:result.grade,recordingId};
+  run=null;lock(true);$('save').hidden=false;$('save').disabled=false;
+  $('play').disabled=false;$('play').textContent='Record new run';message('Run complete. Choose Save run to keep the result.');
+}
+$('save').onclick=async()=>{
+  if(!pending)return;
+  $('save').disabled=true;lock(true);$('play').disabled=true;
+  try{await GameLibrary.record(pending);}
+  catch(e){lock(false);$('play').disabled=false;message('Save failed. Try again.');$('save').disabled=false;return;}
+  pending=null;lock(false);$('play').disabled=false;$('save').hidden=true;message('Saved to run history.');await history();
+};
 let burstTime=-1000;
 const starter='<score-partwise><work><work-title>Studio scale</work-title></work><part id="P1">'+
   ['CDEF','GFED','C'].map((bar,i)=>'<measure number="'+(i+1)+'"><attributes><divisions>1</divisions></attributes>'+
@@ -51,7 +64,12 @@ async function history(){
   const graded=rows.filter(r=>r.grade!=null);
   $('best').textContent='Best '+(graded.length?display(Math.max(...graded.map(r=>r.grade)))+'/100':'—');
   $('runs').replaceChildren(...rows.slice().reverse().map((r,i)=>{
-    const li=document.createElement('li');li.textContent='Run '+(rows.length-i)+' · '+new Date(r.time).toLocaleString()+' · '+(r.grade==null?'Ungraded':display(r.grade)+'/100');return li;
+    const li=document.createElement('li');li.textContent='Run '+(rows.length-i)+' · '+new Date(r.time).toLocaleString()+' · '+(r.grade==null?'Ungraded':display(r.grade)+'/100');
+    if(r.recordingId && window.Android?.hasRecording?.(r.recordingId)){
+      const play=document.createElement('button');play.textContent='Replay';
+      play.onclick=()=>Android.replayTake(r.recordingId,0);li.append(' ',play);
+    }
+    return li;
   }));
   const {ctx,w,h}=canvas('chart'),recent=rows.slice(-24);
   ctx.font='12px sans-serif';ctx.fillStyle='#705a46';
@@ -66,6 +84,7 @@ async function history(){
 }
 function clearReplay(){if(replayUrl)URL.revokeObjectURL(replayUrl);replayUrl=null;$('replay').pause();$('replay').removeAttribute('src');$('replay').hidden=true;}
 function reset(){
+  pending=null;$('save').hidden=true;
   ScoreDemo.stop();$('preview').textContent='Hear line';$('judgment').textContent='READY';$('combo').textContent='0×';$('tally').textContent='000000';$('fill').style.width='0%';
   clearReplay();cursor=camera=pulse=0;colors={};$('points').textContent='—';$('position').textContent='Measure '+lines[+$('line').value].score.notes[0].measure;
   $('clock').textContent='0:00';$('metrics').textContent='';$('findings').replaceChildren();
@@ -85,11 +104,17 @@ async function add(xml,name){
   return GameLibrary.save(xml,parsed[0].score.title==='Uploaded piece'?name:parsed[0].score.title);
 }
 function message(s){$('status').textContent=s;}
-function lock(on){for(const id of ['piece','line','import','preview'])$(id).disabled=on;}
+function lock(on){for(const id of ['piece','line','performer','import','preview'])$(id).disabled=on;}
 function assess(r,partial){
-  const result=Coach.assess(r.score,r.segmenter.observations(),{partial,uncertain:r.segmenter.uncertain});
+  const result=Coach.assess(r.score,r.segmenter.observations(),{partial,voice:r.voice,uncertain:r.segmenter.uncertain});
   colors=result.colors;const next=Math.max(0,r.score.notes.findIndex(n=>n.id===result.current));
-  if(next!==cursor)pulse=8;cursor=next;
+  if(partial){
+    ScoreDemo.follow(r.follow,r.schedule,r.score.notes,r.segmenter.observations(),r.time||0,r.voice);
+    const position=r.follow.index||0;
+    if(position!==cursor)pulse=8;
+    cursor=position;colors=r.follow.colors||{};
+    result.current=r.score.notes[cursor].id;
+  }
   $('position').textContent='Measure '+r.score.notes[cursor].measure+(heard?' · Heard '+heard:'');
   const grade=partial?result.provisionalGrade:result.grade;
   const fraction=Math.min(1,result.matched/r.score.notes.length);
@@ -102,7 +127,7 @@ function assess(r,partial){
   }
   $('combo').textContent=chain+'×';
   const hitKey=result.current+'/'+colors[result.current];
-  if(result.matched && r.lastHit!==hitKey){
+  if(result.matched && colors[result.current] && r.lastHit!==hitKey){
     r.lastHit=hitKey;
     const mark=colors[result.current];
     $('judgment').textContent=({correct:'ON PITCH',pitch:'CHECK PITCH',rhythm:'CHECK TIMING'})[mark]||'TRACKING';
@@ -112,6 +137,7 @@ function assess(r,partial){
       $('judgment').animate([{transform:'scale(1.25)',opacity:.55},{transform:'scale(1)',opacity:1}],{duration:220});
     }
   }
+  if(partial && !colors[result.current])$('judgment').textContent='LISTENING';
   if(!partial)$('judgment').textContent=grade==null?'UNRATED':'RUN COMPLETE';
   $('points').textContent=grade==null?'—':display(grade)+'/100';
   $('metrics').textContent=(partial?'Live estimate':'Final assessment')+' · Pitch '+display(result.pitch)+' · Coverage '+display(result.coverage)+' · Rhythm '+display(result.rhythm);
@@ -132,15 +158,14 @@ async function finish(){
     release(r);if(run!==r)return;
     replayUrl=URL.createObjectURL(new Blob(r.chunks,{type:r.rec.mimeType}));$('replay').src=replayUrl;$('replay').hidden=false;
     for(const f of result.findings.slice(0,3)){const b=document.createElement('button');b.textContent='Replay measure '+f.measure+' · '+f.message;b.onclick=()=>{$('replay').currentTime=Math.max(0,f.time-.3);$('replay').play().catch(e=>message(e.message));};$('findings').append(b);}
-    try{await GameLibrary.record({line:r.key,time:Date.now(),grade:result.grade});await history();message(result.grade==null?'Ungraded run saved':'Run saved');}
-    catch(e){message('Could not save run: '+e.message);}
-    finally{run=null;lock(false);$('play').disabled=false;$('play').textContent='Record another run';}
+    review(r,result,null);
   };
   r.rec.stop();
 }
 async function start(){
+  if(pending && !confirm('Discard this unsaved run and record again?'))return;
   const id=++ticket;reset();lock(true);$('play').disabled=true;message('Opening microphone…');
-  const r={score:lines[+$('line').value].score,key:key(),segmenter:new Coach.Segmenter(),chunks:[]};run=r;
+  const r={score:lines[+$('line').value].score,key:key(),segmenter:new Coach.Segmenter(),chunks:[],voice:$('performer').value==='voice',follow:{}};r.schedule=ScoreDemo.schedule(r.score,null);run=r;
   try{
     if(window.Android?.start){r.native=true;heard='';Android.start(24,95);return;}
     r.ctx=new AudioContext();await r.ctx.resume();if(id!==ticket)return;
@@ -153,7 +178,7 @@ async function start(){
     r.rec.start(1000);const origin=r.ctx.currentTime;let last=-1;
     $('play').disabled=false;$('play').textContent='Finish run';message('Recording');heard='';
     r.timer=setInterval(()=>{
-      const t=r.ctx.currentTime-origin;analyser.getFloatTimeDomainData(samples);
+      const t=r.time=r.ctx.currentTime-origin;analyser.getFloatTimeDomainData(samples);
       const hz=fundamental(samples,r.ctx.sampleRate);let energy=0,cross=0,a=0,b=0;
       const lag=hz?Math.round(r.ctx.sampleRate/hz):samples.length;
       for(let i=0;i<samples.length;i++){const x=samples[i];energy+=x*x;if(i>=lag){const y=samples[i-lag];a+=x*x;b+=y*y;cross+=x*y;}}
@@ -173,7 +198,8 @@ $('preview').onclick=async()=>{
     await ScoreDemo.play(lines[+$('line').value].score,null,()=>{$('preview').textContent='Hear line';});
   }catch(e){$('preview').textContent='Hear line';message(e.message);}
 };
-window.gameBusy=()=>Boolean(run);
+window.gameBusy=()=>Boolean(run)||Boolean(pending && $('save').disabled);
+window.leaveRun=()=>!pending || confirm('Leave without saving this run?');
 window.gameEvent=(type,data)=>{
   const r=run;
   if(type==='error'){cancel();message(data.message);return true;}
@@ -183,7 +209,7 @@ window.gameEvent=(type,data)=>{
   if(type==='started'){message('Recording · CREPE live');$('play').disabled=false;$('play').textContent='Finish run';return true;}
   if(type==='cancelled'){cancel();message(data.message);return true;}
   if(type==='frame'){
-    r.segmenter.push(data);
+    r.time=data.time;r.segmenter.push(data);
     heard=data.confidence>=.6?Coach.pitchName(data.midi):'';
     if(data.time-(r.lastUpdate??-1)>.12){assess(r,true);r.lastUpdate=data.time;}else draw();
     $('clock').textContent=Math.floor(data.time/60)+':'+String(Math.floor(data.time%60)).padStart(2,'0');
@@ -194,9 +220,7 @@ window.gameEvent=(type,data)=>{
     const replay=(label,time)=>{const b=document.createElement('button');b.textContent=label;b.onclick=()=>Android.replayTake(data.recordingId,time);$('findings').append(b);};
     replay('Listen to this run',0);
     for(const f of result.findings.slice(0,3))replay('Replay measure '+f.measure+' · '+f.message,Math.max(0,f.time-.3));
-    GameLibrary.record({line:r.key,time:Date.now(),grade:result.grade,recordingId:data.recordingId})
-      .then(history).then(()=>message('Run saved')).catch(e=>message(e.message));
-    cancel();return true;
+    review(r,result,data.recordingId);return true;
   }
   return true;
 };
@@ -207,7 +231,10 @@ window.stopGame=()=>{ScoreDemo.stop();if(run?.native){Android.stop();return;}if(
 window.addEventListener('pagehide',window.stopGame);document.addEventListener('visibilitychange',()=>{if(document.hidden)window.stopGame();});
 window.addEventListener('resize',()=>{draw();if(selected)history().catch(e=>message(e.message));});
 (async()=>{const first=await add(starter,'Studio scale');let id=first;
-  if(window.Android && parent.gamePieces)for(const piece of parent.gamePieces())await GameLibrary.save(piece.xml,piece.title);
+  if(window.Android && parent.gamePieces){
+    const library=parent.gamePieces();
+    for(const piece of library){const saved=await GameLibrary.save(piece.xml,piece.title);if(piece===library[0])id=saved;}
+  }
   for(const [name,encoded] of window.practiceUploads||[]){try{id=await add(new TextDecoder().decode(Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))),name);}catch(e){message(e.message);}}
   await reload(id);
 })().catch(e=>message('Library unavailable: '+e.message));

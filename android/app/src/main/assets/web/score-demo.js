@@ -60,6 +60,25 @@ const ScoreDemo = (() => {
       throw error;
     }
   }
-  return {schedule,play,stop};
+  // The recording clock owns position. Each heard attack can mark one nearby slot.
+  function follow(state, schedule, notes, events, time, voice) {
+    if (!events.length || !schedule.notes.length) return;
+    state.origin ??= events[0].onset - schedule.notes[0].on;
+    state.index ??= 0;
+    state.colors ??= {};
+    const slots = schedule.notes;
+    while (state.index+1 < slots.length && slots[state.index+1].on <= time-state.origin) state.index++;
+    for (let i=state.processed||0;i<events.length;i++) {
+      const event=events[i], at=event.onset-state.origin;
+      let slot=0;
+      while(slot+1<slots.length && Math.abs(slots[slot+1].on-at)<Math.abs(slots[slot].on-at)) slot++;
+      if(Math.abs(slots[slot].on-at)>Math.min(.35,(slots[slot].off-slots[slot].on)*.5)) continue;
+      const delta=event.midi-notes[slot].midi;
+      const distance=Math.abs(voice ? delta-12*Math.round(delta/12) : delta);
+      if(distance<=.45) state.colors[notes[slot].id]='correct';
+    }
+    state.processed=events.length;
+  }
+  return {schedule,play,stop,follow};
 })();
 if (typeof module === 'object' && module.exports) module.exports = ScoreDemo;

@@ -153,7 +153,7 @@ field renaming in one package.
    cancellation must not restart inference or save a spurious report.
 2. Validate input before expensive inference. Android currently accepts plain
    XML/MusicXML up to 5 MB, with a 4-million-character saved-library budget;
-   PCM16 WAV mono/stereo at 8–96 kHz, up to 25 MB and 180 seconds. Desktop audio
+   MP3, M4A, MP4 with audio, or PCM16 WAV mono/stereo at 8–96 kHz, up to 25 MB and 180 seconds. Desktop audio
    remains limited to 45 seconds/25 MB. Keep UI, decoder and docs consistent.
 3. Preserve lead-in silence and original recording clocks through downmixing,
    resampling and cleaning. Inspect silence/clipping before normalization.
@@ -169,7 +169,7 @@ field renaming in one package.
    gap/error must not shift every later note. Select a written line from actual
    observations; preserve wrong notes as findings rather than changing the score.
 7. Expressive mode starts at 50% pitch, 30% coverage, 20% local rhythm. Full pitch
-   credit through 35 cents tapers to zero at 100 cents. Rhythm is full through
+   credit on Android extends through 45 cents and tapers to zero at 125 cents. Rhythm is full through
    0.15 local beats and zero at 0.5. Exclude the tested onset from its timing
    anchors; suppress timing across long gaps/rests or inadequate anchors.
    Reweight unavailable components. Android target-tempo mode uses 45/25/20 plus

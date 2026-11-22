@@ -34,7 +34,7 @@ function setPage(page){
     window.Android?.stopPlayback?.();
     const panel=document.createElement('iframe');panel.title='Score run';panel.allow='microphone; autoplay';
     panel.src='game/index.html';gameHost.append(panel);
-  }else if(game && page!=='game'){game.contentWindow?.stopGame?.();game.remove();}
+  }else if(game && page!=='game'){if(game.contentWindow?.leaveRun && !game.contentWindow.leaveRun())return;game.contentWindow?.stopGame?.();game.remove();}
   const host=$('tools-page'),frame=host.querySelector('iframe');
   if(page==='tools'&&!frame){window.Android?.stopPlayback?.();const tools=document.createElement('iframe');tools.title='Tuner, metronome and drone';tools.allow='microphone; autoplay';tools.src='tools/index.html';host.append(tools);}
   else if(page!=='tools'&&frame){frame.contentWindow?.stopPracticeTools?.();frame.remove();}
@@ -135,7 +135,7 @@ function begin(imported=false){
   segmenter=new Coach.Segmenter();inference=[];clipped=false;lastFrame=0;activeSessionId=null;setPhase('loading');notice('Loading your local pitch model…');Android.start(24,95);
 }
 function evaluate(partial){return Coach.assess(session.score,segmenter.observations(),{partial,uncertain:segmenter.uncertain,mode:session.mode,targetBpm:session.target,voice:session.instrument==='voice'});}
-window.gamePieces=()=>store.library();
+window.gamePieces=()=>[{title:'Twinkle, Twinkle, Little Star',xml:twinkle('auto')},...store.library()];
 window.nativeEvent=(type,data)=>{
   const game=$('game-page').querySelector('iframe')?.contentWindow;
   if(game){
@@ -169,7 +169,7 @@ window.nativeEvent=(type,data)=>{
       const match=ScoreLines.choose(scoreLines,segmenter.observations(),selection,session.instrument==='voice');
       if(!match.ambiguous && score!==match.line.score){
         score=match.line.score;partIndex=scoreLines.indexOf(match.line);session.partIndex=partIndex;
-        session.score=activeScore();session.scoreKey=key();delete session.clock;renderScore();$('start').disabled=true;$('audio-upload').disabled=true;
+        session.score=activeScore();session.scoreKey=key();delete session.clock;delete session.follow;session.cursor=0;renderScore();$('start').disabled=true;$('audio-upload').disabled=true;
       }
     }
     if(automaticLine && scoreLines.length>1 && !segmenter.observations().length){
@@ -184,13 +184,14 @@ window.nativeEvent=(type,data)=>{
           const written=session.mode==='guided'?{...score,tempos:[{beat:0,bpm:session.target}]}:score;
           session.clock=ScoreDemo.schedule(written,selection);
         }
-        const anchor=lastAnalysis.path.filter(p=>p.kind==='match' && Math.abs(p.note.midi-p.event.midi)<=1.25).at(-1);
-        const guide=anchor && session.clock.notes[anchor.index];
-        const elapsed=guide ? guide.on+(data.time-anchor.event.onset) : data.time-heard[0].onset+(session.clock.notes[0]?.on??0);
-        let index=0;
-        while(index+1<session.clock.notes.length && session.clock.notes[index+1].on<=elapsed)index++;
-        const sounding=session.score.notes;
-        lastAnalysis.current=sounding[index]?.id||lastAnalysis.current;
+        session.follow ??= {};
+        ScoreDemo.follow(session.follow,session.clock,session.score.notes,heard,data.time,session.instrument==='voice');
+        lastAnalysis.current=session.score.notes[session.follow.index].id;
+        lastAnalysis.colors=session.follow.colors;
+      } else if(heard.length){
+        const index=session.score.notes.findIndex(n=>n.id===lastAnalysis.current);
+        session.cursor=Math.max(session.cursor||0,index);
+        lastAnalysis.current=session.score.notes[session.cursor].id;
       }
       const cursor=session.score.notes.find(n=>n.id===lastAnalysis.current);
       if(cursor)$('follow-label').textContent='Measure '+cursor.measure+' / '+Coach.pitchName(cursor.midi);
@@ -206,7 +207,7 @@ window.nativeEvent=(type,data)=>{
     lastAnalysis.reportLine=reportLine;lastAnalysis.inferenceMs=Coach.median(inference)||0;lastAnalysis.clipped=clipped;
     recordingId=data.recordingId||null;setPhase('idle');renderScore();showReport(lastAnalysis);
     const r=lastAnalysis;const {path,...savedResult}=r;
-    const record={date:Date.now(),...session,title:score.title,passage:session.selection?.label||'Whole piece',duration:data.duration??lastFrame,recordingId,grade:r.grade,pitch:r.pitch,coverage:r.coverage,rhythm:r.rhythm,bpm:r.bpm,fraction:r.fraction,findings:r.findings,model:r.model,result:savedResult};delete record.score;delete record.clock;
+    const record={date:Date.now(),...session,title:score.title,passage:session.selection?.label||'Whole piece',duration:data.duration??lastFrame,recordingId,grade:r.grade,pitch:r.pitch,coverage:r.coverage,rhythm:r.rhythm,bpm:r.bpm,fraction:r.fraction,findings:r.findings,model:r.model,result:savedResult};delete record.score;delete record.clock;delete record.follow;
     try{store.addRecord(record);recordStore=store.records();notice('Practice saved on this tablet. Read your next action below.');}catch(error){notice(error.message+' The current report is still available.');}
     session=null;segmenter=null;activeSessionId=null;$('coach-title').textContent='One take closer.';$('coach-copy').textContent=r.findings[0]?.message||'Finish with one deliberate replay of the phrase.';return;
   }
@@ -363,7 +364,7 @@ function openRecord(record){
 document.querySelectorAll('.nav').forEach(n=>n.onclick=()=>setPage(n.dataset.page));
 for(const [id,p]of Object.entries(Coach.profiles))$('instrument').add(new Option(p.name,id));
 $('instrument').value=Coach.profiles[settings.instrument]?settings.instrument:'auto';
-$('mode').value=['guided','expressive','written'].includes(settings.mode)?settings.mode:'expressive';$('target').value=Number(settings.target)>=30&&Number(settings.target)<=240?settings.target:80;
+$('mode').value=['guided','expressive','written'].includes(settings.mode)?settings.mode:'written';$('target').value=Number(settings.target)>=30&&Number(settings.target)<=240?settings.target:80;
 $('transpose').value=['score','concert','-12','-2','-9','0'].includes(settings.transpose)?settings.transpose:'score';
 function updateTempoControl() {
   $('target').closest('label').hidden = $('mode').value !== 'guided';

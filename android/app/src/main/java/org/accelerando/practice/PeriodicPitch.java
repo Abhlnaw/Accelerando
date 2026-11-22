@@ -6,6 +6,10 @@ final class PeriodicPitch {
     private final double[] difference = new double[246];
 
     double midi(float[] samples, int low, int high) {
+        return midi(samples,low,high,.12);
+    }
+
+    double midi(float[] samples,int low,int high,double threshold){
         for (int i = 0; i < signal.length; i++)
             signal[i] = (samples[2*i] + samples[2*i+1]) * .5;
         int last = Math.min(difference.length - 1, (int)Math.ceil(8000 / hz(low)) + 1);
@@ -21,7 +25,7 @@ final class PeriodicPitch {
             sum += error;
             difference[lag] = sum > 0 ? error * lag / sum : 1;
             int center = lag - 1;
-            if (center >= first && difference[center] < .12 &&
+            if (center >= first && difference[center] < threshold &&
                 difference[center] <= difference[center-1] && difference[center] <= difference[lag]) {
                 double a = difference[center-1], b = difference[center], c = difference[lag];
                 double curvature = a + c - 2*b;
