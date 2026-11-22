@@ -229,6 +229,9 @@ $('import').onclick=()=>window.Android?Android.importFile('score'):$('file').cli
 $('file').onchange=async()=>{const f=$('file').files[0];if(f && f.size<=5*1024*1024)await importGameScore(await f.text(),f.name);else message('Choose MusicXML under 5 MB.');$('file').value='';};
 window.stopGame=()=>{ScoreDemo.stop();if(run?.native){Android.stop();return;}if(run){cancel();message('Run interrupted');}};
 window.addEventListener('pagehide',window.stopGame);document.addEventListener('visibilitychange',()=>{if(document.hidden)window.stopGame();});
+$('chart').closest('details').addEventListener('toggle',event=>{
+  if(event.target.open && selected) history().catch(error=>message(error.message));
+});
 window.addEventListener('resize',()=>{draw();if(selected)history().catch(e=>message(e.message));});
 (async()=>{const first=await add(starter,'Studio scale');let id=first;
   if(window.Android && parent.gamePieces){

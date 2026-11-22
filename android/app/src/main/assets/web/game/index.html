@@ -4,10 +4,10 @@
 <div class="pick"><label>Piece<select id="piece"></select></label><label>Written line<select id="line"></select></label>
 <label>Performing<select id="performer"><option value="voice">Voice (any octave)</option><option value="instrument">Instrument (score pitch)</option></select></label><button id="import">Add MusicXML</button><input type="file" accept=".xml,.musicxml" id="file" hidden></div>
 <div class="stage"><div class="hud"><span id="position">Ready</span><strong id="points">—</strong></div>
-<div class="arcade"><output id="tally">000000</output><div><b id="combo">0×</b> combo</div></div><div id="judgment">READY</div><div class="progress"><i id="fill"></i></div><canvas id="lane" aria-label="Written pitches on a scrolling staff"></canvas>
+<details><summary>Points and combo</summary><div class="arcade"><output id="tally">000000</output><div><b id="combo">0×</b> combo</div></div></details><div id="judgment">READY</div><div class="progress"><i id="fill"></i></div><canvas id="lane" aria-label="Written pitches on a scrolling staff"></canvas>
 <p id="critique">Choose a piece to start.</p></div>
 <div class="actions"><button id="preview">Hear line</button><button class="primary" id="play" disabled>Record a run</button><button id="save" hidden>Save run</button><span id="clock">0:00</span><span id="status" role="status"></span></div>
 <p id="metrics"></p><audio id="replay" controls hidden></audio><div id="findings"></div>
-</section><section><div class="hud"><h2>Run history</h2><strong id="best">Best —</strong></div>
-<canvas id="chart" aria-label="Scores for recent runs"></canvas><details><summary>Individual runs</summary><ol id="runs"></ol></details></section></main>
+</section><details><summary>Run history</summary><div class="hud"><strong id="best">Best —</strong></div>
+<canvas id="chart" aria-label="Scores for recent runs"></canvas><details><summary>Individual runs</summary><ol id="runs"></ol></details></details></main>
 <script src="../core.js"></script><script src="../score-lines.js"></script><script src="../tools/pitch.js"></script><script src="../score-demo.js"></script><script src="library.js"></script><script src="game.js"></script></body></html>

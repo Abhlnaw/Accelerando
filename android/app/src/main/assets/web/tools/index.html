@@ -23,18 +23,18 @@
 <div class="stepper"><button id="slower" aria-label="One BPM slower">−</button><button id="faster" aria-label="One BPM faster">+</button><button id="tap">Tap tempo</button></div>
 <label>Beats per bar<select id="beats"></select></label>
 <label>Clicks per beat<select id="division"><option value="1">1 · Beat</option><option value="2">2 · Eighths</option><option value="3">3 · Triplets</option><option value="4">4 · Sixteenths</option></select></label>
-<label>Downbeat<select id="accent"><option value="on">Accented</option><option value="off">Even clicks</option></select></label>
+</div><details><summary>Click sound and volume</summary><div class="controls"><label>Downbeat<select id="accent"><option value="on">Accented</option><option value="off">Even clicks</option></select></label>
 <label>Click sound<select id="clickTone"><option value="sine">Round click</option><option value="triangle">Woodblock</option><option value="square">Electronic</option></select></label>
-<label>Click volume<input id="clickVolume" type="range" min="0" max="100" value="65"></label></div>
+<label>Click volume<input id="clickVolume" type="range" min="0" max="100" value="65"></label></div></details>
 <button class="primary" id="click">Start metronome</button>
 </section>
 <section id="drone" hidden>
 <div class="face"><div class="caption">Reference drone</div><output class="readout" id="droneDisplay">A3</output><p id="droneFrequency">220.0 Hz</p></div>
 <div class="controls"><label>Root note<select id="root"></select></label><label>Octave<select id="octave"></select></label>
-<label>Tone<select id="wave"><option value="sine">Pure sine</option><option value="triangle">Soft triangle</option><option value="sawtooth">Bright reed</option></select></label>
+</div><details><summary>Drone sound and tuning</summary><div class="controls"><label>Tone<select id="wave"><option value="sine">Pure sine</option><option value="triangle">Soft triangle</option><option value="sawtooth">Bright reed</option></select></label>
 <label>Harmony<select id="harmony"><option value="0">Root alone</option><option value="7">Root + fifth</option><option value="12">Root + octave</option><option value="4">Root + major third</option><option value="3">Root + minor third</option></select></label>
 <label>Concert A (Hz)<input id="droneReference" min="400" max="480" type="number" value="440"></label>
-<label>Drone volume<input id="droneVolume" type="range" min="0" max="100" value="35"></label></div>
+<label>Drone volume<input id="droneVolume" type="range" min="0" max="100" value="35"></label></div></details>
 <button class="primary" id="sustain">Start drone</button>
 </section>
 <footer><span role="status" id="status">Ready</span><button id="silence" disabled>Stop all</button></footer>
