@@ -134,7 +134,7 @@ function begin(imported=false){
   resetReport();session={score:activeScore(),scoreKey:key(),pieceId,instrument:$('instrument').value,partIndex,selection:selection?{...selection}:null,mode:$('mode').value,target:target||80,transpose:$('transpose').value};
   segmenter=new Coach.Segmenter();inference=[];clipped=false;lastFrame=0;activeSessionId=null;setPhase('loading');notice('Loading your local pitch model…');Android.start(24,95);
 }
-function evaluate(partial){return Coach.assess(session.score,segmenter.observations(),{partial,uncertain:segmenter.uncertain,mode:session.mode,targetBpm:session.target,voice:session.instrument==='voice'});}
+function evaluate(partial){return Coach.assess(session.score,segmenter.observations(),{partial,uncertain:segmenter.uncertain,mode:session.mode,targetBpm:session.target,voice:['auto','voice'].includes(session.instrument)});}
 window.gamePieces=()=>[{title:'Twinkle, Twinkle, Little Star',xml:twinkle('auto')},...store.library()];
 window.nativeEvent=(type,data)=>{
   const game=$('game-page').querySelector('iframe')?.contentWindow;
@@ -156,7 +156,13 @@ window.nativeEvent=(type,data)=>{
     $('audio-level').style.width=Math.max(0,Math.min(100,(20*Math.log10(Math.max(1e-8,data.rms))+90)*100/90))+'%';$('elapsed').textContent=`${Math.floor(data.time/60)}:${String(Math.floor(data.time%60)).padStart(2,'0')}`;
     $('audio-status').textContent=data.clipped?'Input is clipping. Move the tablet farther away.':data.rms<.00003?'Waiting for your instrument…':data.confidence<.6?'Uncertain sound — listen closer, avoid chords or background audio.':'Hearing your melody';
     if(data.confidence>=.6){$('heard-note').textContent=Coach.pitchName(data.midi);$('heard-hz').textContent=`${Coach.frequency(data.midi).toFixed(1)} Hz`;$('heard-confidence').textContent=`${Math.round(data.confidence*100)}% pitch evidence`;}else{$('heard-note').textContent='—';$('heard-hz').textContent='';$('heard-confidence').textContent='Waiting for a reliable pitch';}
-    if(data.confidence>=.6)lastVoiced=data.time;
+    if(data.confidence>=.6){
+      lastVoiced=data.time;
+      session.voicedLevel=session.voicedLevel==null?data.rms:.9*session.voicedLevel+.1*data.rms;
+    } else if(lastVoiced!==null && data.rms>Math.max(.0001,session.voicedLevel*.20)){
+      // Unresolved but still audible singing is not an end-of-take pause.
+      lastVoiced=data.time;
+    }
     if(liveMic && lastVoiced!==null && !finishRequested && segmenter.events.length){
       const current=session.score.notes.findIndex(n=>n.id===lastAnalysis?.current);
       const gap=current>=0 && session.score.notes[current+1] ? session.score.notes[current+1].onset-session.score.notes[current].onset : 0;
@@ -166,7 +172,7 @@ window.nativeEvent=(type,data)=>{
       }
     }
     if(automaticLine && scoreLines.length>1 && data.time-lastRender>.15){
-      const match=ScoreLines.choose(scoreLines,segmenter.observations(),selection,session.instrument==='voice');
+      const match=ScoreLines.choose(scoreLines,segmenter.observations(),selection,['auto','voice'].includes(session.instrument));
       if(!match.ambiguous && score!==match.line.score){
         score=match.line.score;partIndex=scoreLines.indexOf(match.line);session.partIndex=partIndex;
         session.score=activeScore();session.scoreKey=key();delete session.clock;delete session.follow;session.cursor=0;renderScore();$('start').disabled=true;$('audio-upload').disabled=true;
@@ -185,7 +191,7 @@ window.nativeEvent=(type,data)=>{
           session.clock=ScoreDemo.schedule(written,selection);
         }
         session.follow ??= {};
-        ScoreDemo.follow(session.follow,session.clock,session.score.notes,heard,data.time,session.instrument==='voice');
+        ScoreDemo.follow(session.follow,session.clock,session.score.notes,heard,data.time,['auto','voice'].includes(session.instrument));
         lastAnalysis.current=session.score.notes[session.follow.index].id;
         lastAnalysis.colors=session.follow.colors;
       } else if(heard.length){
@@ -195,13 +201,13 @@ window.nativeEvent=(type,data)=>{
       }
       const cursor=session.score.notes.find(n=>n.id===lastAnalysis.current);
       if(cursor)$('follow-label').textContent='Measure '+cursor.measure+' / '+Coach.pitchName(cursor.midi);
-      markNotes(lastAnalysis);const finding=lastAnalysis.findings.at(-1);if(finding){$('coach-title').textContent=`Measure ${finding.measure}`;$('coach-copy').textContent=finding.message;}else{$('coach-title').textContent=`${lastAnalysis.matched} notes heard`;$('coach-copy').textContent='Keep going. Live markings are provisional; the final report checks the whole passage.';}
+      markNotes(lastAnalysis);const finding=lastAnalysis.findings.at(-1);if(finding){$('coach-title').textContent=`Measure ${finding.measure}`;$('coach-copy').textContent=finding.message;}else{$('coach-title').textContent=`${heard.length} notes heard`;$('coach-copy').textContent=heard.length ? lastAnalysis.matched+' matched to the selected music.' : data.rms<.00003?'No microphone signal yet. Check microphone access or move closer.':'Sound is reaching the mic. Sustain one note to establish a pitch.';}
       $('latency').textContent=data.inferenceMs?`${Math.round(data.inferenceMs)} ms inference`:'Local processing';}
     return;
   }
   if(type==='stopped'){
     if(!segmenter||!session)return;segmenter.finish();let ambiguous=false;
-    if(automaticLine&&scoreLines.length>1){const match=ScoreLines.choose(scoreLines,segmenter.observations(),selection,session.instrument==='voice');ambiguous=match.ambiguous;partIndex=scoreLines.indexOf(match.line);score=match.line.score;session.score=activeScore();session.partIndex=partIndex;session.scoreKey=key();}
+    if(automaticLine&&scoreLines.length>1){const match=ScoreLines.choose(scoreLines,segmenter.observations(),selection,['auto','voice'].includes(session.instrument));ambiguous=match.ambiguous;partIndex=scoreLines.indexOf(match.line);score=match.line.score;session.score=activeScore();session.partIndex=partIndex;session.scoreKey=key();}
     reportLine=ambiguous?'Several written lines fit similarly. Select a line in the library or record a more distinctive phrase.':scoreLines[partIndex]?.label||'';
     lastAnalysis=evaluate(false);if(ambiguous)Object.assign(lastAnalysis,{passage:null,grade:null,status:'insufficient_evidence',pitch:null,rhythm:null,coverage:null,findings:[],colors:{}});
     lastAnalysis.reportLine=reportLine;lastAnalysis.inferenceMs=Coach.median(inference)||0;lastAnalysis.clipped=clipped;
@@ -209,7 +215,7 @@ window.nativeEvent=(type,data)=>{
     const r=lastAnalysis;const {path,...savedResult}=r;
     const record={date:Date.now(),...session,title:score.title,passage:session.selection?.label||'Whole piece',duration:data.duration??lastFrame,recordingId,grade:r.grade,pitch:r.pitch,coverage:r.coverage,rhythm:r.rhythm,bpm:r.bpm,fraction:r.fraction,findings:r.findings,model:r.model,result:savedResult};delete record.score;delete record.clock;delete record.follow;
     try{store.addRecord(record);recordStore=store.records();notice('Practice saved on this tablet. Read your next action below.');}catch(error){notice(error.message+' The current report is still available.');}
-    session=null;segmenter=null;activeSessionId=null;$('coach-title').textContent='Take complete';$('coach-copy').textContent=r.findings[0]?.message||'Finish with one deliberate replay of the phrase.';return;
+    $('report').scrollIntoView?.({block:'start'});session=null;segmenter=null;activeSessionId=null;$('coach-title').textContent='Take complete';$('coach-copy').textContent=r.findings[0]?.message||'Finish with one deliberate replay of the phrase.';return;
   }
   if(type==='score'){setPhase('idle');importScore(data.xml);return;}
   if(type==='error'){if(/permission/i.test(data.message||''))$('audio-status').closest('details').open=true;if(data.scope==='audio'||!data.scope||phase==='importing'){session=null;segmenter=null;activeSessionId=null;setPhase('idle');}notice(data.message);return;}
@@ -226,7 +232,7 @@ function showReport(result){
     else $('report-context').textContent+=' Select the measure you are playing. For singing in a different octave, choose Voice.';
   }
   if(result.passage)$('report-context').textContent+=` Excerpt score covers the first ${result.passage.notes} written attacks (measures ${result.passage.first} to ${result.passage.last}).`;
-  if(result.octaveShift)$('report-context').textContent+=` Voice matched in your singing register (${Math.abs(result.octaveShift)/12} octave difference).`;
+  if(result.octaveShift)$('report-context').textContent+=` Matched in your performing register (${Math.abs(result.octaveShift)/12} octave difference).`;
   $('findings').replaceChildren();
   $('report-context').textContent += ' '+(result.reportLine||'');
   for(const finding of result.findings.slice(0,3)){

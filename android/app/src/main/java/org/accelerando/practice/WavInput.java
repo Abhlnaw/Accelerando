@@ -31,7 +31,7 @@ final class WavInput {
     }
     int samples16k(){return (int)((long)frames*16000/rate);}
     float sample16k(int index){
-        double position=index*rate/16000.0;int first=(int)position,last=Math.min(first+1,frames-1);float a=0,b=0;
+        double position=(long)index*rate/16000.0;int first=(int)position,last=Math.min(first+1,frames-1);float a=0,b=0;
         for(int channel=firstChannel;channel<firstChannel+channelCount;channel++){
             a+=(short)integer(data,offset+2*(first*channels+channel),2)/32768f/channelCount;
             b+=(short)integer(data,offset+2*(last*channels+channel),2)/32768f/channelCount;

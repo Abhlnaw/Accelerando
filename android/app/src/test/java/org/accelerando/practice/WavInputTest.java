@@ -14,6 +14,10 @@ public class WavInputTest {
     @Test public void monoResamplingPreservesOriginalDuration()throws Exception{
         WavInput input=WavInput.parse(wav(48000,1,48000));assertEquals(16000,input.samples16k());assertEquals(.25,input.sample16k(8000),1e-6);
     }
+    @Test public void fullTakeResamplesThroughLastFrame()throws Exception{
+        WavInput input=WavInput.parse(wav(48000,1,48000*25));
+        assertEquals(.25,input.sample16k(input.samples16k()-1),1e-6);
+    }
     @Test public void stereoIsDownmixedWithoutChangingClock()throws Exception{
         WavInput input=WavInput.parse(wav(22050,2,22050));assertEquals(16000,input.samples16k());assertEquals(.125,input.sample16k(123),1e-6);
     }

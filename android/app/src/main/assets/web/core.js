@@ -112,7 +112,8 @@
       this.lastGood=t;
       if(!this.current){this.current={onset:Math.max(0,t-.032),end:t,samples:[midi],confidences:[confidence]};this.lowEnergy=rms;return true;}
       const c=this.current, stable=median(c.samples.slice(-9));
-      const reattack=t-c.onset>.20 && this.lowEnergy<rms*.42 && rms>this.previousEnergy*1.3;
+      // A softly rearticulated syllable or pluck may stay voiced across the attack.
+      const reattack=t-c.onset>.16 && this.lowEnergy<rms*.60 && rms>this.previousEnergy*1.22;
       if(Math.abs(midi-stable)>.75||reattack){
         this.pending.push(frame);
         if(reattack||this.pending.length>=3){

@@ -34,7 +34,7 @@ public class AppRuntimeTest {
             assertEquals("false",js(scenario,"document.getElementById('progress-page').hidden"));
             js(scenario,"document.querySelector('[data-page=tools]').click()");
             await(scenario,"!!document.querySelector('#tools-page iframe')?.contentDocument?.getElementById('listen')");
-            assertEquals("true",js(scenario,"!!document.querySelector('#tools-page iframe').contentWindow.stopPracticeTools"));
+            await(scenario,"!!document.querySelector('#tools-page iframe').contentWindow.stopPracticeTools");
             js(scenario,"document.querySelector('[data-page=home]').click()");
             assertEquals("true",js(scenario,"document.querySelector('#tools-page iframe')===null"));
             assertEquals("true",js(scenario,"window.Android.saveData('settings',JSON.stringify({instrument:'guitar',mode:'expressive',pieceId:'twinkle'}))"));

@@ -136,7 +136,13 @@ final class PitchEngine implements AutoCloseable {
                     confidence = .70;
                 }
             }
-            listener.frame(seconds,midi,clipped?0:Math.max(0,confidence),rms,(System.nanoTime()-start)/1e6,clipped);
+            // A few overloaded attack samples need a warning, but can still carry a stable pitch.
+            if (clipped) {
+                double periodicMidi=periodic.midi(window,lowMidi,highMidi);
+                confidence=clippingCount<window.length/8 && best>=.60 && Math.abs(periodicMidi-midi)<.45
+                        ? Math.min(.75,best) : 0;
+            }
+            listener.frame(seconds,midi,Math.max(0,confidence),rms,(System.nanoTime()-start)/1e6,clipped);
         }
     }
 
