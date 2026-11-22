@@ -150,7 +150,7 @@ window.nativeEvent=(type,data)=>{
   if(data.sessionId!==undefined&&activeSessionId!==null&&data.sessionId!==activeSessionId)return;
   if(type==='cancelled'){session=null;segmenter=null;activeSessionId=null;setPhase('idle');notice(data.message||'Take cancelled. Nothing was saved.');return;}
   if(type==='playback'){notice(data.message);return;}
-  if(type==='started'){liveMic=data.message==='Listening through the tablet microphone';lastVoiced=null;finishRequested=false;segmenter=new Coach.Segmenter();inference=[];clipped=false;lastAnalysis=null;lastFrame=0;lastRender=-Infinity;$('report').hidden=true;setPhase('recording');notice('');$('coach-title').textContent='I’m listening.';$('coach-copy').textContent='Play your passage. Pause at the end to finish automatically.';return;}
+  if(type==='started'){liveMic=data.message==='Listening through the tablet microphone';lastVoiced=null;finishRequested=false;segmenter=new Coach.Segmenter();inference=[];clipped=false;lastAnalysis=null;lastFrame=0;lastRender=-Infinity;$('report').hidden=true;setPhase('recording');notice('');$('coach-title').textContent='I’m listening.';$('coach-copy').textContent='Play your passage. Pause at the end to finish automatically.';if(!liveMic && data.message){$('coach-title').textContent='Playing your upload';$('coach-copy').textContent='Follow the score while your recording plays.';$('stop').textContent='Cancel upload';}return;}
   if(type==='frame'){
     if(!segmenter||phase!=='recording')return;lastFrame=data.time;segmenter.push(data);if(data.inferenceMs>0)inference.push(data.inferenceMs);clipped=clipped||data.clipped;
     $('audio-level').style.width=Math.max(0,Math.min(100,(20*Math.log10(Math.max(1e-8,data.rms))+90)*100/90))+'%';$('elapsed').textContent=`${Math.floor(data.time/60)}:${String(Math.floor(data.time%60)).padStart(2,'0')}`;
@@ -236,7 +236,7 @@ function showReport(result){
   $('findings').replaceChildren();
   $('report-context').textContent += ' '+(result.reportLine||'');
   for(const finding of result.findings.slice(0,3)){
-    const item=document.createElement('div');item.className='finding '+finding.kind;const text=document.createElement('div'),title=document.createElement('strong'),copy=document.createElement('p'),button=document.createElement('button');title.textContent=`Measure ${finding.measure} · ${finding.kind}`;copy.textContent=finding.message+(finding.approximate?' Replay time is an approximate neighboring anchor.':'');button.textContent='Replay passage';button.className='secondary';button.disabled=!recordingId;button.onclick=()=>replay(Math.max(0,finding.time-.3));text.append(title,copy);item.append(text,button);$('findings').append(item);
+    const item=document.createElement('div');item.className='finding '+finding.kind;const text=document.createElement('div'),title=document.createElement('strong'),copy=document.createElement('p'),button=document.createElement('button');title.textContent=`Measure ${finding.measure} · ${finding.kind}`;copy.textContent=finding.message+(finding.approximate?' Replay time is an approximate neighboring anchor.':'');button.textContent='Hear passage (3 s)';button.className='secondary';button.disabled=!recordingId;button.onclick=()=>replay(Math.max(0,finding.time-.5),true);text.append(title,copy);item.append(text,button);$('findings').append(item);
   }
   if(!result.findings.length){const p=document.createElement('p');p.className='intro';p.textContent=result.grade===null?'No confident corrections to show. Try the whole passage in a quieter room.':'No specific correction stood out. Play the phrase again with the sound you want.';$('findings').append(p);}
   $('replay-full').disabled=!recordingId||!!(window.Android?.hasRecording&&!Android.hasRecording(recordingId));
@@ -309,7 +309,7 @@ function attemptRow(record){
   if(!record.manual)row.append(button);
   return row;
 }
-function replay(seconds){if(phase!=='idle')return;if(!recordingId){notice('No saved audio is available for this report.');return;}if(window.Android?.replayTake)Android.replayTake(recordingId,seconds);else notice('Audio replay is available in the Android app.');}
+function replay(seconds,passage=false){if(phase!=='idle')return;if(!recordingId){notice('No saved audio is available for this report.');return;}if(passage && window.Android?.replayPassage)Android.replayPassage(recordingId,seconds);else if(window.Android?.replayTake)Android.replayTake(recordingId,seconds);else notice('Audio replay is available in the Android app.');}
 function renderHome(){
   const totals=store.summary();$('home-metrics').replaceChildren(metric('Practice attempts',totals.attempts,true),metric('Practice minutes',totals.minutes.toFixed(1)),metric('Pieces practiced',totals.pieces),metric('Saved scores',store.library().length+1));
   $('home-piece').textContent=score.title;$('home-instrument').textContent=`${Coach.profiles[$('instrument').value].name} · ${score.measures.length} measures · ${selection?'Measure '+selection.label:'Whole piece'}`;

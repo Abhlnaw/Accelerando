@@ -95,10 +95,13 @@ public final class MainActivity extends Activity {
     private void message(String type,String value) {JSONObject p=new JSONObject();try{p.put("message",value);}catch(JSONException ignored){}event(type,p);}
     private void error(String scope,String value){JSONObject p=new JSONObject();try{p.put("message",value);p.put("scope",scope);}catch(JSONException ignored){}event("error",p);}
     private void audioState(String type,String value,int id){JSONObject p=new JSONObject();try{p.put("message",value);p.put("sessionId",id);if(type.equals("error"))p.put("scope","audio");}catch(JSONException ignored){}event(type,p);}
-    private void playFile(Uri uri,double seconds){
+    private void playFile(Uri uri,double seconds){playFile(uri,seconds,0);}
+    private void playFile(Uri uri,double seconds,int clipMs){
         if(player!=null)player.release();MediaPlayer next=new MediaPlayer();player=next;
         try{next.setDataSource(this,uri);
-            next.setOnPreparedListener(p->{if(player!=p||destroyed)return;p.seekTo((long)(Math.max(0,Math.min(seconds,p.getDuration()/1000.0))*1000),MediaPlayer.SEEK_CLOSEST);p.start();message("playback","Playing audio. Starting a take stops playback.");});
+            next.setOnPreparedListener(p->{if(player!=p||destroyed)return;p.seekTo((long)(Math.max(0,Math.min(seconds,p.getDuration()/1000.0))*1000),MediaPlayer.SEEK_CLOSEST);p.start();
+                if(clipMs>0)web.postDelayed(()->{if(player==p){player=null;p.release();message("playback","Passage finished.");}},clipMs);
+                message("playback","Playing audio. Starting a take stops playback.");});
             next.setOnCompletionListener(p->{if(player==p){p.release();player=null;message("playback","Playback finished.");}});
             next.setOnErrorListener((p,what,extra)->{if(player==p){p.release();player=null;}error("playback","This audio could not be played. Choose another recording.");return true;});next.prepareAsync();
         }catch(Exception ex){next.release();player=null;error("playback","This audio could not be opened. Choose it again.");}
@@ -139,10 +142,12 @@ public final class MainActivity extends Activity {
             try{if(key.equals("settings"))new JSONObject(json);else{JSONArray a=new JSONArray(json);if(a.length()>(key.equals("history")?500:100))return false;}return getPreferences(MODE_PRIVATE).edit().putString(key,json).commit();}
             catch(JSONException ex){return false;}
         }
-        @JavascriptInterface public void replayTake(String id,double seconds){runOnUiThread(()->{
+        @JavascriptInterface public void replayTake(String id,double seconds){replay(id,seconds,0);}
+        @JavascriptInterface public void replayPassage(String id,double seconds){replay(id,seconds,3000);}
+        private void replay(String id,double seconds,int duration){runOnUiThread(()->{
             if(busy){error("playback","Finish the current take before playing audio.");return;}
             File file=repository.find(id);if(file==null){error("playback","This recording is no longer stored. Its report is still available.");return;}
-            playFile(Uri.fromFile(file),seconds);
+            playFile(Uri.fromFile(file),seconds,duration);
         });}
         @JavascriptInterface public void saveHistory(String json){
             if(json.length()>4_000_000)return;
@@ -152,6 +157,38 @@ public final class MainActivity extends Activity {
             if(busy||json.length()>4_000_000)return;
             exportData=json;
             runOnUiThread(()->{Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.setType("application/json");intent.addCategory(Intent.CATEGORY_OPENABLE);intent.putExtra(Intent.EXTRA_TITLE,"accelerando-practice.json");startActivityForResult(intent,43);});
+        }
+    }
+
+    // Own the player on the inference worker so cancellation never releases it mid-read.
+    private void playAndAnalyze(byte[] wav, PitchEngine pitch, PitchEngine.Listener output) throws Exception {
+        File file=File.createTempFile("upload-playback-", ".wav", getCacheDir());
+        MediaPlayer playback=new MediaPlayer();
+        try {
+            try(FileOutputStream stream=new FileOutputStream(file)){stream.write(wav);}
+            WavInput.parse(wav);
+            playback.setDataSource(file.getAbsolutePath());
+            playback.prepare();
+            int duration=playback.getDuration();
+            if(cancelled)return;
+            playback.start();
+            pitch.analyzeWav(wav,(time,midi,confidence,rms,ms,clipped)->{
+                waitForPlayback(playback,Math.min((int)(1000*time),duration-1));
+                if(!cancelled)output.frame(time,midi,confidence,rms,ms,clipped);
+            });
+            waitForPlayback(playback,duration-1);
+        } finally {playback.release();file.delete();}
+    }
+    private void waitForPlayback(MediaPlayer player,int target){
+        long deadline=android.os.SystemClock.elapsedRealtime()+5000;
+        while(!cancelled && player.getCurrentPosition()+5<target){
+            if(!player.isPlaying()){
+                if(target>=player.getDuration()-64)return;
+                throw new IllegalStateException("Upload playback stopped. Please try again.");
+            }
+            if(android.os.SystemClock.elapsedRealtime()>deadline)
+                throw new IllegalStateException("Upload playback stalled. Please try again.");
+            android.os.SystemClock.sleep(8);
         }
     }
 
@@ -168,8 +205,8 @@ public final class MainActivity extends Activity {
                 PitchEngine.Listener listener=(time,midi,confidence,rms,ms,clipped)->{
                     JSONObject p=new JSONObject();try{p.put("sessionId",sessionId);p.put("time",time);p.put("midi",midi);p.put("confidence",confidence);p.put("rms",rms);p.put("inferenceMs",ms);p.put("clipped",clipped);}catch(JSONException ignored){}event("frame",p);
                 };
-                if(imported==null)instance.record(listener);else instance.analyzeWav(imported,listener);
-                if(instance.durationSeconds()<=.1){busy=false;audioState("cancelled","Take cancelled. Nothing was saved.",sessionId);return;}
+                if(imported==null)instance.record(listener);else playAndAnalyze(imported,instance,listener);
+                if((imported!=null && cancelled)||instance.durationSeconds()<=.1){busy=false;audioState("cancelled","Take cancelled. Nothing was saved.",sessionId);return;}
                 String recordingId=repository.save(instance,imported);
                 JSONObject finished=new JSONObject();finished.put("sessionId",sessionId);finished.put("recordingId",recordingId);finished.put("duration",instance.durationSeconds());
                 busy=false;event("stopped",finished);

@@ -217,9 +217,9 @@ window.gameEvent=(type,data)=>{
   }
   if(type==='stopped'){
     r.segmenter.finish();const result=assess(r,false);
-    const replay=(label,time)=>{const b=document.createElement('button');b.textContent=label;b.onclick=()=>Android.replayTake(data.recordingId,time);$('findings').append(b);};
+    const replay=(label,time,passage=false)=>{const b=document.createElement('button');b.textContent=label;b.onclick=()=>passage?Android.replayPassage(data.recordingId,time):Android.replayTake(data.recordingId,time);$('findings').append(b);};
     replay('Listen to this run',0);
-    for(const f of result.findings.slice(0,3))replay('Replay measure '+f.measure+' · '+f.message,Math.max(0,f.time-.3));
+    for(const f of result.findings.slice(0,3))replay('Replay measure '+f.measure+' · '+f.message,Math.max(0,f.time-.5),true);
     review(r,result,data.recordingId);return true;
   }
   return true;

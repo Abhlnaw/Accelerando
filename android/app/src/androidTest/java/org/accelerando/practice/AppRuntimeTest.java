@@ -80,7 +80,7 @@ public class AppRuntimeTest {
     }
     @Test public void uploadedScoreAudioReportAndRestartUseRealBackend()throws Exception{
         android.content.Context context=InstrumentationRegistry.getInstrumentation().getTargetContext();
-        int[] pitches={60,62,64,65,67,69};StringBuilder notes=new StringBuilder();
+        int[] pitches={60,62,65,65,67,69};StringBuilder notes=new StringBuilder();
         for(String step:new String[]{"C","D","E","F","G","A"})notes.append("<note><pitch><step>").append(step).append("</step><octave>4</octave></pitch><duration>1</duration></note>");
         String source="<score-partwise><work><work-title>Runtime Test Melody</work-title></work><part id=\"P1\"><measure number=\"1\"><attributes><divisions>1</divisions></attributes>"+notes+"</measure></part></score-partwise>";
         File score=new File(context.getCacheDir(),"runtime-score.musicxml"),audio=new File(context.getCacheDir(),"runtime-take.wav");
@@ -97,10 +97,15 @@ public class AppRuntimeTest {
             js(scenario,"document.getElementById('instrument').value='piano';document.getElementById('instrument').onchange()");
             scenario.onActivity(a->a.onActivityResult(42,android.app.Activity.RESULT_OK,new android.content.Intent().setData(android.net.Uri.fromFile(score))));
             await(scenario,"document.getElementById('piece-title').textContent==='Runtime Test Melody'");
+            long start=android.os.SystemClock.elapsedRealtime();
             scenario.onActivity(a->{try{java.lang.reflect.Field kind=MainActivity.class.getDeclaredField("importKind");kind.setAccessible(true);kind.set(a,"take");a.onActivityResult(42,android.app.Activity.RESULT_OK,new android.content.Intent().setData(android.net.Uri.fromFile(audio)));}catch(Exception ex){throw new RuntimeException(ex);}});
             await(scenario,"!document.getElementById('report').hidden && document.getElementById('start').hidden===false");
-            assertEquals("true",js(scenario,"JSON.parse(Android.loadData('history')).some(r=>r.title==='Runtime Test Melody' && r.grade>=95 && !!r.recordingId)"));
+            assertTrue("Report must follow playback of the 3.6-second upload", android.os.SystemClock.elapsedRealtime()-start>=3400);
+            assertEquals("true",js(scenario,"JSON.parse(Android.loadData('history')).some(r=>r.title==='Runtime Test Melody' && r.grade>60 && r.grade<99 && !!r.recordingId)"));
             assertEquals("false",js(scenario,"document.getElementById('replay-full').disabled"));
+            js(scenario,"document.querySelector('#findings button').click()");
+            await(scenario,"document.getElementById('notice').textContent.includes('Playing audio')");
+            await(scenario,"['Passage finished.','Playback finished.'].includes(document.getElementById('notice').textContent)");
             js(scenario,"document.getElementById('replay-full').click()");
             await(scenario,"document.getElementById('notice').textContent.includes('Playing audio') || document.getElementById('notice').textContent.includes('Playback finished')");
             js(scenario,"document.getElementById('stop-take-playback').click()");

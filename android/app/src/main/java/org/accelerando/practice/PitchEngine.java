@@ -21,6 +21,7 @@ final class PitchEngine implements AutoCloseable {
     private final boolean[] clippedRing = new boolean[1024];
     private int writeIndex, clippingCount;
     private float previousInput, previousOutput;
+    private final NoiseFilter noiseFilter = new NoiseFilter();
     private final PeriodicPitch periodic = new PeriodicPitch();
     private long samples;
     private int untilFrame;
@@ -110,6 +111,7 @@ final class PitchEngine implements AutoCloseable {
         for (float x : window) energy += x*x;
         double rms = Math.sqrt(energy/1024), seconds = Math.max(0, (samples-512)/16000.0);
         if (rms < .00003) { listener.frame(seconds, 0, 0, rms, 0, false); return; }
+        noiseFilter.clean(window);
         long start = System.nanoTime();
         try (OnnxTensor input = OnnxTensor.createTensor(environment, FloatBuffer.wrap(window), new long[]{1,1024});
              OrtSession.Result output = session.run(Collections.singletonMap("audio",input))) {
